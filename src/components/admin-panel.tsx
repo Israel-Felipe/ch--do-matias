@@ -2,12 +2,37 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, LogOut, Plus, Trash2, Unlock } from "lucide-react";
+import { Check, Loader2, LogOut, Pencil, Plus, Trash2, Unlock, X } from "lucide-react";
 import type { Gift, Rsvp } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+type GiftDraft = {
+  title: string;
+  brand: string;
+  notes: string;
+  link: string;
+  avg_price: string;
+};
+
+function giftToDraft(gift: Gift): GiftDraft {
+  return {
+    title: gift.title,
+    brand: gift.brand ?? "",
+    notes: gift.notes ?? "",
+    link: gift.link ?? "",
+    avg_price: gift.avg_price == null ? "" : String(gift.avg_price),
+  };
+}
 
 export function AdminPanel() {
   const [checking, setChecking] = useState(true);
@@ -23,6 +48,10 @@ export function AdminPanel() {
   const [link, setLink] = useState("");
   const [avgPrice, setAvgPrice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<GiftDraft | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const loadGifts = useCallback(async () => {
@@ -80,6 +109,8 @@ export function AdminPanel() {
     setAuthed(false);
     setGifts([]);
     setRsvps([]);
+    setEditingId(null);
+    setDraft(null);
   }
 
   async function handleDeleteRsvp(id: string) {
@@ -101,52 +132,86 @@ export function AdminPanel() {
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
-    const res = await fetch("/api/gifts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        brand,
-        notes,
-        link,
-        avg_price: avgPrice.trim() === "" ? null : Number(avgPrice.replace(",", ".")),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setMessage(data.error || "Não foi possível adicionar");
-      return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          brand,
+          notes,
+          link,
+          avg_price:
+            avgPrice.trim() === "" ? null : Number(avgPrice.replace(",", ".")),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || "Não foi possível adicionar");
+        return;
+      }
+      setTitle("");
+      setBrand("");
+      setNotes("");
+      setLink("");
+      setAvgPrice("");
+      setCreateOpen(false);
+      setMessage("Item adicionado.");
+      await loadGifts();
+    } finally {
+      setCreating(false);
     }
-    setTitle("");
-    setBrand("");
-    setNotes("");
-    setLink("");
-    setAvgPrice("");
-    setMessage("Item adicionado.");
-    await loadGifts();
   }
 
-  async function handlePriceBlur(id: string, raw: string) {
-    const trimmed = raw.trim();
+  function startEdit(gift: Gift) {
+    setEditingId(gift.id);
+    setDraft(giftToDraft(gift));
+    setMessage(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft(null);
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!draft) return;
+    if (!draft.title.trim()) {
+      setMessage("Título obrigatório");
+      return;
+    }
     const avg_price =
-      trimmed === "" ? null : Number(trimmed.replace(",", "."));
+      draft.avg_price.trim() === ""
+        ? null
+        : Number(draft.avg_price.replace(",", "."));
     if (avg_price != null && Number.isNaN(avg_price)) {
       setMessage("Preço inválido");
       return;
     }
+
     setBusyId(id);
     setMessage(null);
     try {
       const res = await fetch(`/api/gifts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avg_price }),
+        body: JSON.stringify({
+          title: draft.title,
+          brand: draft.brand.trim() || null,
+          notes: draft.notes.trim() || null,
+          link: draft.link.trim() || null,
+          avg_price,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar preço");
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
       setGifts((prev) => prev.map((g) => (g.id === id ? data.gift : g)));
+      setEditingId(null);
+      setDraft(null);
+      setMessage("Item atualizado.");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao salvar preço");
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar");
     } finally {
       setBusyId(null);
     }
@@ -181,6 +246,7 @@ export function AdminPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao remover");
       setGifts((prev) => prev.filter((g) => g.id !== id));
+      if (editingId === id) cancelEdit();
       setMessage("Item removido.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao remover");
@@ -237,7 +303,7 @@ export function AdminPanel() {
         <div>
           <h1 className="font-script text-4xl text-ink sm:text-5xl">Admin</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Adicione, remova ou libere reservas da lista.
+            Adicione, edite, remova ou libere reservas da lista.
           </p>
         </div>
         <div className="flex gap-2">
@@ -259,78 +325,13 @@ export function AdminPanel() {
         </div>
       </div>
 
-      <form
-        onSubmit={handleCreate}
-        className="mt-8 space-y-3 rounded-[1.5rem] bg-card/90 p-4 ring-1 ring-border/70 sm:p-5"
-      >
-        <h2 className="font-display text-lg text-ink">Novo item</h2>
-        <div className="space-y-2">
-          <Label htmlFor="title">Título</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            className="h-12 rounded-2xl text-base"
-            placeholder="Ex.: Fraldas M"
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="brand">Marca</Label>
-            <Input
-              id="brand"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              className="h-12 rounded-2xl text-base"
-              placeholder="Ex.: Mustela"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="avgPrice">Preço médio (R$)</Label>
-            <Input
-              id="avgPrice"
-              inputMode="decimal"
-              value={avgPrice}
-              onChange={(e) => setAvgPrice(e.target.value)}
-              className="h-12 rounded-2xl text-base"
-              placeholder="Ex.: 49,90"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="notes">Observação</Label>
-          <Input
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="h-12 rounded-2xl text-base"
-            placeholder="Opcional"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="link">Link de referência</Label>
-          <Input
-            id="link"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            className="h-12 rounded-2xl text-base"
-            placeholder="https://..."
-          />
-        </div>
-        <Button type="submit" className="h-12 w-full rounded-full text-base sm:w-auto">
-          <Plus className="h-4 w-4" />
-          Adicionar
-        </Button>
-      </form>
-
       {message ? (
-        <p className="mt-4 rounded-2xl bg-pond/60 px-4 py-3 text-sm text-ink">
+        <p className="mt-6 rounded-2xl bg-pond/60 px-4 py-3 text-sm text-ink">
           {message}
         </p>
       ) : null}
 
-      <div className="mt-10">
+      <div className="mt-8">
         <h2 className="font-display text-lg text-ink">
           Presenças ({rsvps.length})
         </h2>
@@ -377,86 +378,314 @@ export function AdminPanel() {
       </div>
 
       <div className="mt-8">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-display text-lg text-ink">Itens ({gifts.length})</h2>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin text-ink-soft" /> : null}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-lg text-ink">
+              Itens ({gifts.length})
+            </h2>
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-ink-soft" />
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            className="h-10 rounded-full"
+            onClick={() => {
+              setMessage(null);
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Incluir novo item
+          </Button>
         </div>
         <ul className="space-y-2">
-          {gifts.map((gift) => (
-            <li
-              key={gift.id}
-              className="rounded-2xl bg-card/90 p-4 ring-1 ring-border/60"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-display text-base text-ink">{gift.title}</p>
-                    {gift.brand ? (
-                      <Badge variant="secondary" className="rounded-full">
-                        {gift.brand}
-                      </Badge>
-                    ) : null}
+          {gifts.map((gift) => {
+            const editing = editingId === gift.id ? draft : null;
+
+            return (
+              <li
+                key={gift.id}
+                className="rounded-2xl bg-card/90 p-4 ring-1 ring-border/60"
+              >
+                {editing ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-title-${gift.id}`}>Título</Label>
+                      <Input
+                        id={`edit-title-${gift.id}`}
+                        value={editing.title}
+                        onChange={(e) =>
+                          setDraft((d) => (d ? { ...d, title: e.target.value } : d))
+                        }
+                        className="h-11 rounded-2xl text-base"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`edit-brand-${gift.id}`}>Marca</Label>
+                        <Input
+                          id={`edit-brand-${gift.id}`}
+                          value={editing.brand}
+                          onChange={(e) =>
+                            setDraft((d) =>
+                              d ? { ...d, brand: e.target.value } : d,
+                            )
+                          }
+                          className="h-11 rounded-2xl text-base"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`edit-price-${gift.id}`}>
+                          Preço médio (R$)
+                        </Label>
+                        <Input
+                          id={`edit-price-${gift.id}`}
+                          inputMode="decimal"
+                          value={editing.avg_price}
+                          onChange={(e) =>
+                            setDraft((d) =>
+                              d ? { ...d, avg_price: e.target.value } : d,
+                            )
+                          }
+                          className="h-11 rounded-2xl text-base"
+                          placeholder="Ex.: 49,90"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-notes-${gift.id}`}>Observação</Label>
+                      <Input
+                        id={`edit-notes-${gift.id}`}
+                        value={editing.notes}
+                        onChange={(e) =>
+                          setDraft((d) =>
+                            d ? { ...d, notes: e.target.value } : d,
+                          )
+                        }
+                        className="h-11 rounded-2xl text-base"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-link-${gift.id}`}>
+                        Link de referência
+                      </Label>
+                      <Input
+                        id={`edit-link-${gift.id}`}
+                        value={editing.link}
+                        onChange={(e) =>
+                          setDraft((d) =>
+                            d ? { ...d, link: e.target.value } : d,
+                          )
+                        }
+                        className="h-11 rounded-2xl text-base"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    {gift.claimed_by ? (
+                      <p className="text-sm text-ink-soft">
+                        Reservado por <strong>{gift.claimed_by}</strong>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-sage">Disponível</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="h-11 flex-1 rounded-full sm:flex-none"
+                        disabled={busyId === gift.id}
+                        onClick={() => void handleSaveEdit(gift.id)}
+                      >
+                        {busyId === gift.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 flex-1 rounded-full sm:flex-none"
+                        disabled={busyId === gift.id}
+                        onClick={cancelEdit}
+                      >
+                        <X className="h-4 w-4" />
+                        Cancelar
+                      </Button>
+                    </div>
                   </div>
-                  {gift.notes ? (
-                    <p className="mt-1 text-xs text-ink-soft">{gift.notes}</p>
-                  ) : null}
-                  <div className="mt-2 flex max-w-[12rem] items-center gap-2">
-                    <Label
-                      htmlFor={`price-${gift.id}`}
-                      className="shrink-0 text-xs text-ink-soft"
-                    >
-                      Preço médio
-                    </Label>
-                    <Input
-                      id={`price-${gift.id}`}
-                      inputMode="decimal"
-                      defaultValue={
-                        gift.avg_price == null ? "" : String(gift.avg_price)
-                      }
-                      key={`${gift.id}-${gift.avg_price ?? "empty"}`}
-                      disabled={busyId === gift.id}
-                      className="h-9 rounded-xl text-sm"
-                      placeholder="R$"
-                      onBlur={(e) => void handlePriceBlur(gift.id, e.target.value)}
-                    />
+                ) : (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-display text-base text-ink">
+                          {gift.title}
+                        </p>
+                        {gift.brand ? (
+                          <Badge variant="secondary" className="rounded-full">
+                            {gift.brand}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {gift.notes ? (
+                        <p className="mt-1 text-xs text-ink-soft">{gift.notes}</p>
+                      ) : null}
+                      {gift.link ? (
+                        <a
+                          href={gift.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 block max-w-[16rem] truncate text-xs text-copper underline-offset-2 hover:underline sm:max-w-xs"
+                          title={gift.link}
+                        >
+                          {gift.link}
+                        </a>
+                      ) : null}
+                      {gift.avg_price != null ? (
+                        <p className="mt-1 text-xs text-ink-soft">
+                          Preço médio: R${" "}
+                          {Number(gift.avg_price).toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                      ) : null}
+                      {gift.claimed_by ? (
+                        <p className="mt-1 text-sm text-ink-soft">
+                          Reservado por <strong>{gift.claimed_by}</strong>
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm text-sage">Disponível</p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-nowrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 rounded-full"
+                        disabled={busyId === gift.id}
+                        onClick={() => startEdit(gift)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
+                      {gift.claimed_by ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 rounded-full"
+                          disabled={busyId === gift.id}
+                          onClick={() => void handleRelease(gift.id)}
+                        >
+                          <Unlock className="h-4 w-4" />
+                          Liberar
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="h-11 rounded-full"
+                        disabled={busyId === gift.id}
+                        onClick={() => void handleDelete(gift.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remover
+                      </Button>
+                    </div>
                   </div>
-                  {gift.claimed_by ? (
-                    <p className="mt-1 text-sm text-ink-soft">
-                      Reservado por <strong>{gift.claimed_by}</strong>
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-sage">Disponível</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {gift.claimed_by ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 flex-1 rounded-full sm:flex-none"
-                      disabled={busyId === gift.id}
-                      onClick={() => void handleRelease(gift.id)}
-                    >
-                      <Unlock className="h-4 w-4" />
-                      Liberar
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="h-11 flex-1 rounded-full sm:flex-none"
-                    disabled={busyId === gift.id}
-                    onClick={() => void handleDelete(gift.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Remover
-                  </Button>
-                </div>
-              </div>
-            </li>
-          ))}
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[90svh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-3xl border-border bg-card p-5 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-ink">
+              Novo item
+            </DialogTitle>
+            <DialogDescription className="text-ink-soft">
+              Preencha os dados da sugestão de presente.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="mt-2 space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="title">Título</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="h-12 rounded-2xl text-base"
+                placeholder="Ex.: Fraldas M"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="brand">Marca</Label>
+                <Input
+                  id="brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className="h-12 rounded-2xl text-base"
+                  placeholder="Ex.: Mustela"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avgPrice">Preço médio (R$)</Label>
+                <Input
+                  id="avgPrice"
+                  inputMode="decimal"
+                  value={avgPrice}
+                  onChange={(e) => setAvgPrice(e.target.value)}
+                  className="h-12 rounded-2xl text-base"
+                  placeholder="Ex.: 49,90"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observação</Label>
+              <Input
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="h-12 rounded-2xl text-base"
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="link">Link de referência</Label>
+              <Input
+                id="link"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="h-12 rounded-2xl text-base"
+                placeholder="https://..."
+              />
+            </div>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-full text-base"
+              disabled={creating || !title.trim()}
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Adicionando...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </>
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
