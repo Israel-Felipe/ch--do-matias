@@ -1,0 +1,58 @@
+import { NextResponse } from "next/server";
+import { createRsvp, listRsvps, summarizeRsvps } from "@/lib/rsvps";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
+import type { RsvpStatus } from "@/lib/types";
+
+export const runtime = "nodejs";
+
+export async function GET() {
+  try {
+    const rsvps = await listRsvps();
+    const summary = summarizeRsvps(rsvps);
+    const admin = await isAdminAuthenticated();
+    return NextResponse.json({
+      summary,
+      // Nomes completos só para a família logada; convidados veem só totais.
+      rsvps: admin ? rsvps : [],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao listar";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      name?: string;
+      guests?: number;
+      status?: RsvpStatus;
+      note?: string | null;
+    };
+
+    if (!body.name?.trim()) {
+      return NextResponse.json({ error: "Informe seu nome" }, { status: 400 });
+    }
+
+    const status = body.status ?? "yes";
+    if (!["yes", "no", "maybe"].includes(status)) {
+      return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+    }
+
+    const rsvp = await createRsvp({
+      name: body.name,
+      guests: body.guests,
+      status,
+      note: body.note,
+    });
+
+    const rsvps = await listRsvps();
+    return NextResponse.json(
+      { rsvp, summary: summarizeRsvps(rsvps) },
+      { status: 201 },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao confirmar";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
