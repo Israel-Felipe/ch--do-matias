@@ -24,13 +24,6 @@ export function Hero() {
           priority
         />
         <Image
-          src="/images/abelha.png"
-          alt=""
-          width={120}
-          height={120}
-          className="illus-interactive illus-bee absolute top-[22%] right-[18%] hidden w-14 opacity-80 lg:block xl:right-[22%] xl:w-16"
-        />
-        <Image
           src="/images/folhas.png"
           alt=""
           width={420}

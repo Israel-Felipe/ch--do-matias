@@ -10,7 +10,7 @@ function mode(): "supabase" | "local" {
   if (isSupabaseConfigured()) return "supabase";
   if (process.env.VERCEL) {
     throw new Error(
-      "Supabase não configurado. Na Vercel confira NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SECRET_KEY (integração) ou SUPABASE_SERVICE_ROLE_KEY.",
+      "Supabase não configurado. Confira as variáveis na Vercel (podem vir com prefixo CHA_MATIAS_: URL + SECRET_KEY ou SERVICE_ROLE_KEY).",
     );
   }
   return "local";
