@@ -22,6 +22,26 @@ const AMBUSH_GIVE_UP = 280;
 
 const HINT_IDLE = "Passe o mouse e espere um pouco… ela vem brincar";
 const HINT_FLEE = "Agora fuja com o mouse antes que a abelha te pegue!";
+const RECORD_KEY = "cha-matias-bee-flee-record-ms";
+
+function readRecordMs(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(RECORD_KEY);
+    const n = raw == null ? 0 : Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeRecordMs(ms: number) {
+  try {
+    window.localStorage.setItem(RECORD_KEY, String(Math.floor(ms)));
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 type Bee = {
   id: number;
@@ -33,6 +53,9 @@ type Bee = {
   rotation: number;
   canCatch: boolean;
   primary: boolean;
+  /** Persegue o mouse o tempo todo (ninho + abelha da data). */
+  chaser: boolean;
+  size: "sm" | "md";
   /** Multiplicador de velocidade (cada abelha é um pouco diferente). */
   speed: number;
   /** Fatia do cerco ao redor do cursor. */
@@ -45,6 +68,14 @@ type Bee = {
   /** Se está avançando no mouse na emboscada. */
   lunging: boolean;
 };
+
+const DATE_BEE_ID = -1;
+
+function setDateNestHidden(hidden: boolean) {
+  document.querySelectorAll<HTMLElement>("[data-bee-nest='date']").forEach((el) => {
+    el.style.opacity = hidden ? "0" : "";
+  });
+}
 
 function canChase() {
   if (typeof window === "undefined") return false;
@@ -106,8 +137,8 @@ function assignAmbushPosts(bees: Bee[]) {
   const margin = 70;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const extras = bees.filter((b) => !b.primary);
-  const cols = Math.max(2, Math.ceil(Math.sqrt(extras.length)));
+  const extras = bees.filter((b) => !b.chaser);
+  const cols = Math.max(2, Math.ceil(Math.sqrt(Math.max(extras.length, 1))));
   const rows = Math.max(1, Math.ceil(extras.length / cols));
 
   extras.forEach((bee, i) => {
@@ -203,6 +234,12 @@ export function ChaseBee() {
   const [fleeMs, setFleeMs] = useState(0);
   const [showTimer, setShowTimer] = useState(false);
   const [caughtLabel, setCaughtLabel] = useState<string | null>(null);
+  const [recordMs, setRecordMs] = useState(0);
+  const [newRecord, setNewRecord] = useState(false);
+
+  useEffect(() => {
+    setRecordMs(readRecordMs());
+  }, []);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -213,6 +250,7 @@ export function ChaseBee() {
       window.removeEventListener("mousemove", onMove);
       cancelAnimationFrame(rafRef.current);
       if (windupRef.current) clearTimeout(windupRef.current);
+      setDateNestHidden(false);
     };
   }, []);
 
@@ -250,6 +288,8 @@ export function ChaseBee() {
         rotation: 0,
         canCatch: false,
         primary: true,
+        chaser: true,
+        size: "md",
         speed: 1,
         slot: 0,
         phase: 0,
@@ -257,13 +297,43 @@ export function ChaseBee() {
         postY: home.y,
         lunging: false,
       },
+      ...beesRef.current.filter((b) => !b.primary),
     ];
+  };
+
+  const ensureDateBee = () => {
+    if (beesRef.current.some((b) => b.id === DATE_BEE_ID)) return;
+    const el = document.querySelector<HTMLElement>("[data-bee-nest='date']");
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    beesRef.current.push({
+      id: DATE_BEE_ID,
+      x,
+      y,
+      homeX: x,
+      homeY: y,
+      flipX: false,
+      rotation: 0,
+      canCatch: false,
+      primary: false,
+      chaser: true,
+      size: "sm",
+      speed: 1.08,
+      slot: 0,
+      phase: Math.PI / 3,
+      postX: x,
+      postY: y,
+      lunging: false,
+    });
+    setDateNestHidden(true);
   };
 
   const spawnBee = () => {
     if (beesRef.current.length >= MAX_BEES) return;
     const spot = randomSpawn(mouseRef.current, beesRef.current);
-    const slot = beesRef.current.filter((b) => !b.primary).length;
+    const slot = beesRef.current.filter((b) => !b.chaser).length;
     beesRef.current.push({
       id: nextIdRef.current++,
       x: spot.x,
@@ -274,6 +344,8 @@ export function ChaseBee() {
       rotation: 0,
       canCatch: false,
       primary: false,
+      chaser: false,
+      size: "md",
       speed: 0.82 + Math.random() * 0.45,
       slot,
       phase: Math.random() * Math.PI * 2,
@@ -288,6 +360,7 @@ export function ChaseBee() {
     setBees([]);
     modeRef.current = "idle";
     ambushAssignedRef.current = false;
+    setDateNestHidden(false);
     setActive(false);
     setShowTimer(false);
     setCaughtLabel(null);
@@ -301,10 +374,22 @@ export function ChaseBee() {
 
     const mouse = mouseRef.current;
     ensurePrimaryBee();
+    ensureDateBee();
 
     if (mode === "windup") {
       for (const bee of beesRef.current) {
         Object.assign(bee, faceToward(bee, mouse.x, mouse.y));
+        // A da data já começa a perseguir na contagem, pra não ficar parada.
+        if (bee.chaser && !bee.primary) {
+          const dx = mouse.x - bee.x;
+          const dy = mouse.y - bee.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 0.5) {
+            const step = Math.min(9, Math.max(3, dist * 0.1)) * bee.speed;
+            bee.x += (dx / dist) * step;
+            bee.y += (dy / dist) * step;
+          }
+        }
       }
       publish();
       rafRef.current = requestAnimationFrame(loop);
@@ -340,8 +425,7 @@ export function ChaseBee() {
         let target: { x: number; y: number };
         let speedMul = bee.speed * boost;
 
-        if (bee.primary) {
-          // Uma sempre persegue o mouse.
+        if (bee.chaser) {
           target = { x: mouse.x, y: mouse.y };
         } else if (ambush) {
           const amb = ambushTarget(bee, mouse, elapsedSec);
@@ -396,7 +480,16 @@ export function ChaseBee() {
       if (caught) {
         const finalMs = performance.now() - chaseStartedAtRef.current;
         setFleeMs(finalMs);
-        setCaughtLabel(`Pegou! Você fugiu por ${formatFlee(finalMs)}`);
+        const prev = readRecordMs();
+        if (finalMs > prev) {
+          writeRecordMs(finalMs);
+          setRecordMs(finalMs);
+          setNewRecord(true);
+          setCaughtLabel(`Novo recorde! Você fugiu por ${formatFlee(finalMs)}`);
+        } else {
+          setNewRecord(false);
+          setCaughtLabel(`Pegou! Você fugiu por ${formatFlee(finalMs)}`);
+        }
         setHint(HINT_IDLE);
         modeRef.current = "return";
         rafRef.current = requestAnimationFrame(loop);
@@ -425,6 +518,7 @@ export function ChaseBee() {
             bee.rotation = 0;
             remaining.push(bee);
           }
+          // date / swarm: some ao chegar em casa
           continue;
         }
 
@@ -451,6 +545,7 @@ export function ChaseBee() {
     if (modeRef.current !== "windup") return;
     captureNestHome();
     ensurePrimaryBee();
+    ensureDateBee();
     for (const bee of beesRef.current) bee.canCatch = false;
     chaseStartedAtRef.current = performance.now();
     nextSpawnAtRef.current = chaseStartedAtRef.current + SPAWN_EVERY_MS;
@@ -469,8 +564,10 @@ export function ChaseBee() {
     setHint(HINT_FLEE);
     setCaughtLabel(null);
     setShowTimer(false);
+    setNewRecord(false);
     captureNestHome();
     ensurePrimaryBee();
+    ensureDateBee();
     publish();
 
     cancelAnimationFrame(rafRef.current);
@@ -481,7 +578,7 @@ export function ChaseBee() {
   };
 
   const primary = bees.find((b) => b.primary);
-  const extras = bees.filter((b) => !b.primary);
+  const flying = bees.filter((b) => !b.primary || (active && b.primary));
   const useFixedPrimary = active && primary;
 
   return (
@@ -526,55 +623,49 @@ export function ChaseBee() {
               {formatFlee(fleeMs)}
             </p>
           ) : null}
+          {recordMs > 0 ? (
+            <p
+              className={`font-body text-[0.68rem] tracking-wide xl:text-[0.72rem] ${
+                newRecord
+                  ? "font-bold text-copper"
+                  : "font-semibold text-ink-soft/80"
+              }`}
+            >
+              Recorde: {formatFlee(recordMs)}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {useFixedPrimary ? (
-        <span
-          className="pointer-events-none fixed inline-flex h-14 w-14 items-center justify-center xl:h-16 xl:w-16"
-          style={{
-            left: primary.x - BEE_HALF,
-            top: primary.y - BEE_HALF,
-            willChange: "left, top, transform",
-          }}
-        >
-          <Image
-            src="/images/abelha.png"
-            alt=""
-            width={120}
-            height={120}
-            draggable={false}
-            className="pointer-events-none w-14 select-none opacity-90 xl:w-16"
+      {flying.map((bee) => {
+        if (bee.primary && !useFixedPrimary) return null;
+        const half = bee.size === "sm" ? 16 : BEE_HALF;
+        const box = bee.size === "sm" ? "h-8 w-8" : "h-14 w-14 xl:h-16 xl:w-16";
+        const img = bee.size === "sm" ? "h-7 w-auto sm:h-8" : "w-14 xl:w-16";
+        return (
+          <span
+            key={bee.id}
+            className={`pointer-events-none fixed inline-flex items-center justify-center ${box}`}
             style={{
-              transform: `scaleX(${primary.flipX ? -1 : 1}) rotate(${primary.rotation}deg)`,
+              left: bee.x - half,
+              top: bee.y - half,
+              willChange: "left, top, transform",
             }}
-          />
-        </span>
-      ) : null}
-
-      {extras.map((bee) => (
-        <span
-          key={bee.id}
-          className="pointer-events-none fixed inline-flex h-14 w-14 items-center justify-center xl:h-16 xl:w-16"
-          style={{
-            left: bee.x - BEE_HALF,
-            top: bee.y - BEE_HALF,
-            willChange: "left, top, transform",
-          }}
-        >
-          <Image
-            src="/images/abelha.png"
-            alt=""
-            width={120}
-            height={120}
-            draggable={false}
-            className="pointer-events-none w-14 select-none opacity-90 xl:w-16"
-            style={{
-              transform: `scaleX(${bee.flipX ? -1 : 1}) rotate(${bee.rotation}deg)`,
-            }}
-          />
-        </span>
-      ))}
+          >
+            <Image
+              src="/images/abelha.png"
+              alt=""
+              width={120}
+              height={120}
+              draggable={false}
+              className={`pointer-events-none select-none opacity-90 ${img}`}
+              style={{
+                transform: `scaleX(${bee.flipX ? -1 : 1}) rotate(${bee.rotation}deg)`,
+              }}
+            />
+          </span>
+        );
+      })}
     </div>
   );
 }

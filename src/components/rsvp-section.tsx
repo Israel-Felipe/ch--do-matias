@@ -19,10 +19,20 @@ export function RsvpSection() {
   const [name, setName] = useState("");
   const [guests, setGuests] = useState("1");
   const [status, setStatus] = useState<RsvpStatus>("yes");
+  const [bringing, setBringing] = useState(false);
+  const [bringingWhat, setBringingWhat] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  function selectStatus(next: RsvpStatus) {
+    setStatus(next);
+    if (next !== "yes") {
+      setBringing(false);
+      setBringingWhat("");
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,6 +47,8 @@ export function RsvpSection() {
           guests: Number(guests) || 1,
           status,
           note,
+          bringing: status === "yes" ? bringing : false,
+          bringing_what: status === "yes" && bringing ? bringingWhat : null,
         }),
       });
       const data = await res.json();
@@ -45,6 +57,8 @@ export function RsvpSection() {
       setName("");
       setGuests("1");
       setStatus("yes");
+      setBringing(false);
+      setBringingWhat("");
       setNote("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao enviar");
@@ -114,7 +128,7 @@ export function RsvpSection() {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setStatus(opt.value)}
+                    onClick={() => selectStatus(opt.value)}
                     className={cn(
                       "min-h-12 rounded-2xl px-3 text-sm font-semibold transition",
                       status === opt.value
@@ -140,6 +154,55 @@ export function RsvpSection() {
                   onChange={(e) => setGuests(e.target.value)}
                   className="h-12 rounded-2xl border-border/70 bg-card/80 text-base"
                 />
+              </div>
+            ) : null}
+
+            {status === "yes" ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-card/60 px-3.5 py-3 ring-1 ring-border/50">
+                  <Label
+                    htmlFor="rsvp-bringing"
+                    className="cursor-pointer text-sm font-normal leading-snug text-ink-soft"
+                  >
+                    Posso levar salgado, doce ou bebida
+                  </Label>
+                  <button
+                    id="rsvp-bringing"
+                    type="button"
+                    role="switch"
+                    aria-checked={bringing}
+                    onClick={() => {
+                      const next = !bringing;
+                      setBringing(next);
+                      if (!next) setBringingWhat("");
+                    }}
+                    className={cn(
+                      "relative h-6 w-10 shrink-0 rounded-full transition-colors",
+                      bringing ? "bg-sage" : "bg-border",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                        bringing && "translate-x-4",
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {bringing ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="rsvp-bringing-what">O que você pode levar?</Label>
+                    <Input
+                      id="rsvp-bringing-what"
+                      value={bringingWhat}
+                      onChange={(e) => setBringingWhat(e.target.value)}
+                      required
+                      className="h-12 rounded-2xl border-border/70 bg-card/80 text-base"
+                      placeholder="Ex.: coxinha, bolo, refrigerante..."
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

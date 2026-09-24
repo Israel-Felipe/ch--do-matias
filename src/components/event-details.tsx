@@ -28,7 +28,7 @@ export function EventDetails() {
         />
         <h2 className="font-script text-4xl text-copper sm:text-5xl">O encontro</h2>
         <p className="mt-2 text-sm text-ink-soft sm:text-base">
-          Celebre conosco a chegada do Matias
+          Celebre conosco o Matias que está a caminho
         </p>
       </div>
 
@@ -50,9 +50,8 @@ export function EventDetails() {
           Local
         </p>
         <p className="font-display text-lg text-ink">{eventInfo.locationLabel}</p>
-        <p className="mx-auto max-w-md text-sm leading-relaxed text-ink-soft">
-          {eventInfo.addressLabel}
-        </p>
+        <p className="text-sm text-ink-soft">{eventInfo.addressArea}</p>
+        <p className="text-sm text-ink-soft">{eventInfo.addressStreet}</p>
         <a
           href={eventInfo.mapsUrl}
           target="_blank"

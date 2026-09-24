@@ -31,6 +31,8 @@ export type Rsvp = {
   guests: number;
   status: RsvpStatus;
   note: string | null;
+  bringing: boolean;
+  bringing_what: string | null;
   created_at: string;
 };
 
@@ -39,6 +41,8 @@ export type RsvpInput = {
   guests?: number;
   status: RsvpStatus;
   note?: string | null;
+  bringing?: boolean;
+  bringing_what?: string | null;
 };
 
 export type EventInfo = {
@@ -48,7 +52,8 @@ export type EventInfo = {
   dateLabel: string;
   timeLabel: string;
   locationLabel: string;
-  addressLabel: string;
+  addressArea: string;
+  addressStreet: string;
   mapsUrl: string;
   rsvpLabel: string;
   intro: string;

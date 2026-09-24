@@ -52,6 +52,11 @@ export async function localCreateRsvp(input: RsvpInput): Promise<Rsvp> {
       guests: Math.max(1, Math.min(20, Math.floor(input.guests ?? 1))),
       status: input.status,
       note: input.note?.trim() || null,
+      bringing: input.status === "yes" ? Boolean(input.bringing) : false,
+      bringing_what:
+        input.status === "yes" && input.bringing
+          ? input.bringing_what?.trim() || null
+          : null,
       created_at: new Date().toISOString(),
     };
     rsvps.push(rsvp);

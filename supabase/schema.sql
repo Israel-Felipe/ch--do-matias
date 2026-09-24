@@ -38,6 +38,8 @@ create table if not exists public.rsvps (
   guests integer not null default 1 check (guests >= 1 and guests <= 20),
   status text not null check (status in ('yes', 'no', 'maybe')),
   note text,
+  bringing boolean not null default false,
+  bringing_what text,
   created_at timestamptz not null default now()
 );
 

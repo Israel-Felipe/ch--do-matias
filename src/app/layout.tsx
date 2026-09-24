@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Chá do Matias",
     description:
-      "Celebre a chegada do Matias e o aniversário do papai. 24/10 às 15h no auditório da FLT.",
+      "Celebre o Matias que está a caminho e o aniversário do papai. 24/10 às 15h no auditório da FLT.",
     locale: "pt_BR",
     type: "website",
   },

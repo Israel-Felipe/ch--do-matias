@@ -354,6 +354,9 @@ export function AdminPanel() {
                         ? "Talvez"
                         : "Não vai"}
                     {rsvp.status !== "no" ? ` · ${rsvp.guests} pessoa(s)` : null}
+                    {rsvp.bringing && rsvp.bringing_what
+                      ? ` · Leva: ${rsvp.bringing_what}`
+                      : null}
                     {rsvp.note ? ` · ${rsvp.note}` : null}
                   </p>
                 </div>

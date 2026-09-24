@@ -28,6 +28,8 @@ export async function POST(request: Request) {
       guests?: number;
       status?: RsvpStatus;
       note?: string | null;
+      bringing?: boolean;
+      bringing_what?: string | null;
     };
 
     if (!body.name?.trim()) {
@@ -39,11 +41,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Status inválido" }, { status: 400 });
     }
 
+    const bringing = status === "yes" && Boolean(body.bringing);
+    if (bringing && !body.bringing_what?.trim()) {
+      return NextResponse.json(
+        { error: "Conte o que você pode levar" },
+        { status: 400 },
+      );
+    }
+
     const rsvp = await createRsvp({
       name: body.name,
       guests: body.guests,
       status,
       note: body.note,
+      bringing,
+      bringing_what: bringing ? body.bringing_what : null,
     });
 
     const rsvps = await listRsvps();

@@ -34,6 +34,10 @@ export async function createRsvp(input: RsvpInput): Promise<Rsvp> {
 
   if (mode() === "local") return localCreateRsvp(input);
 
+  const bringing = input.status === "yes" ? Boolean(input.bringing) : false;
+  const bringingWhat =
+    bringing ? input.bringing_what?.trim() || null : null;
+
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from("rsvps")
@@ -42,6 +46,8 @@ export async function createRsvp(input: RsvpInput): Promise<Rsvp> {
       guests: Math.max(1, Math.min(20, Math.floor(input.guests ?? 1))),
       status: input.status,
       note: input.note?.trim() || null,
+      bringing,
+      bringing_what: bringingWhat,
     })
     .select("*")
     .single();

@@ -77,6 +77,8 @@ export function GiftList() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const [selected, setSelected] = useState<GiftType | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>("claim");
   const [name, setName] = useState("");
@@ -114,9 +116,23 @@ export function GiftList() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const minRaw = priceMin.trim().replace(",", ".");
+    const maxRaw = priceMax.trim().replace(",", ".");
+    const min = minRaw === "" ? null : Number(minRaw);
+    const max = maxRaw === "" ? null : Number(maxRaw);
+    const hasMin = min != null && !Number.isNaN(min);
+    const hasMax = max != null && !Number.isNaN(max);
+
     return gifts.filter((g) => {
       if (filter === "available" && g.claimed_by) return false;
       if (filter === "claimed" && !g.claimed_by) return false;
+
+      if (hasMin || hasMax) {
+        if (g.avg_price == null) return false;
+        if (hasMin && g.avg_price < min!) return false;
+        if (hasMax && g.avg_price > max!) return false;
+      }
+
       if (!q) return true;
       return (
         g.title.toLowerCase().includes(q) ||
@@ -124,7 +140,37 @@ export function GiftList() {
         (g.notes?.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [gifts, filter, query]);
+  }, [gifts, filter, query, priceMin, priceMax]);
+
+  const pricePreset = useMemo(() => {
+    const min = priceMin.trim();
+    const max = priceMax.trim();
+    if (min === "" && max === "") return "any";
+    if (min === "" && max === "50") return "to50";
+    if (min === "50" && max === "100") return "50to100";
+    if (min === "100" && max === "200") return "100to200";
+    if (min === "200" && max === "") return "from200";
+    return "custom";
+  }, [priceMin, priceMax]);
+
+  function applyPricePreset(key: string) {
+    if (key === "any") {
+      setPriceMin("");
+      setPriceMax("");
+    } else if (key === "to50") {
+      setPriceMin("");
+      setPriceMax("50");
+    } else if (key === "50to100") {
+      setPriceMin("50");
+      setPriceMax("100");
+    } else if (key === "100to200") {
+      setPriceMin("100");
+      setPriceMax("200");
+    } else if (key === "from200") {
+      setPriceMin("200");
+      setPriceMax("");
+    }
+  }
 
   function openClaim(gift: GiftType) {
     setDialogMode("claim");
@@ -208,9 +254,8 @@ export function GiftList() {
           <h2 className="font-script text-4xl text-copper sm:text-5xl">
             Sugestões de presentes
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-soft sm:text-base">
-            Toque em um item disponível e deixe seu nome. Errou? Em “Desfazer”,
-            digite o mesmo nome da reserva para liberar o item.
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-ink-soft sm:text-base">
+            {eventInfo.intro}
           </p>
         </div>
 
@@ -256,6 +301,67 @@ export function GiftList() {
                 </span>
               </button>
             ))}
+          </div>
+
+          <div className="rounded-2xl bg-card/90 p-3 ring-1 ring-border/70 sm:p-3.5">
+            <p className="mb-2 text-[0.65rem] font-bold tracking-[0.18em] text-ink-soft uppercase">
+              Filtrar por preço
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(
+                [
+                  ["any", "Qualquer"],
+                  ["to50", "Até R$ 50"],
+                  ["50to100", "R$ 50–100"],
+                  ["100to200", "R$ 100–200"],
+                  ["from200", "Acima de R$ 200"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyPricePreset(key)}
+                  className={cn(
+                    "inline-flex min-h-10 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold transition",
+                    pricePreset === key
+                      ? "bg-copper text-white"
+                      : "bg-cream-deep/80 text-ink-soft ring-1 ring-border/60",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="price-min" className="text-xs text-ink-soft">
+                  De (R$)
+                </Label>
+                <Input
+                  id="price-min"
+                  inputMode="decimal"
+                  value={priceMin}
+                  onChange={(e) => setPriceMin(e.target.value)}
+                  placeholder="ex.: 50"
+                  className="h-11 rounded-2xl border-border/80 bg-white/80 text-base shadow-none"
+                  aria-label="Preço mínimo"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="price-max" className="text-xs text-ink-soft">
+                  Até (R$)
+                </Label>
+                <Input
+                  id="price-max"
+                  inputMode="decimal"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value)}
+                  placeholder="ex.: 100"
+                  className="h-11 rounded-2xl border-border/80 bg-white/80 text-base shadow-none"
+                  aria-label="Preço máximo"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

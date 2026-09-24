@@ -58,6 +58,7 @@ export function Hero() {
               alt=""
               width={64}
               height={64}
+              data-bee-nest="date"
               className="illus-bee pointer-events-none absolute -top-4 right-2 h-7 w-auto select-none sm:right-4 sm:h-8"
             />
             <p className="font-display text-[0.85rem] text-ink sm:text-[0.95rem]">
@@ -79,7 +80,7 @@ export function Hero() {
             </a>
             <a
               href="#lista"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-sage bg-white px-5 text-sm font-bold text-sage transition hover:bg-sage-soft/40 active:scale-[0.98]"
+              className="inline-flex min-h-12 items-center justify-end gap-2 rounded-full border border-sage bg-white py-3 pr-5 pl-14 text-sm font-bold text-sage transition hover:bg-sage-soft/40 active:scale-[0.98] sm:justify-center sm:px-5 sm:pl-5"
             >
               <Gift className="h-4 w-4" aria-hidden />
               Sugestões de presentes
