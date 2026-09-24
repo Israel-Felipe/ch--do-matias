@@ -28,6 +28,7 @@ async function ensureStore(): Promise<Gift[]> {
       category: g.category ?? null,
       notes: g.notes ?? null,
       link: g.link ?? null,
+      avg_price: g.avg_price ?? null,
     }));
   } catch {
     const gifts: Gift[] = seedGifts.map((g) => ({
@@ -63,6 +64,10 @@ export async function localCreateGift(input: GiftInput): Promise<Gift> {
       category: input.category?.trim() || null,
       notes: input.notes?.trim() || null,
       link: input.link?.trim() || null,
+      avg_price:
+        input.avg_price == null || Number.isNaN(Number(input.avg_price))
+          ? null
+          : Number(input.avg_price),
       claimed_by: null,
       claimed_at: null,
       sort_order: input.sort_order ?? maxOrder + 1,
@@ -77,7 +82,7 @@ export async function localCreateGift(input: GiftInput): Promise<Gift> {
 export async function localUpdateGift(
   id: string,
   patch: Partial<
-    Pick<Gift, "title" | "brand" | "category" | "notes" | "link" | "sort_order">
+    Pick<Gift, "title" | "brand" | "category" | "notes" | "link" | "avg_price" | "sort_order">
   >,
 ): Promise<Gift | null> {
   return enqueue(async () => {
@@ -98,6 +103,12 @@ export async function localUpdateGift(
         patch.notes === undefined ? gifts[idx].notes : patch.notes?.trim() || null,
       link:
         patch.link === undefined ? gifts[idx].link : patch.link?.trim() || null,
+      avg_price:
+        patch.avg_price === undefined
+          ? gifts[idx].avg_price
+          : patch.avg_price == null || Number.isNaN(Number(patch.avg_price))
+            ? null
+            : Number(patch.avg_price),
     };
     await persist(gifts);
     return gifts[idx];

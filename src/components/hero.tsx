@@ -1,10 +1,11 @@
 import Image from "next/image";
 import { Check, Gift } from "lucide-react";
+import { ChaseBee } from "@/components/chase-bee";
 import { eventInfo } from "@/lib/seed";
 
 export function Hero() {
   return (
-    <header className="relative flex min-h-[100svh] items-center justify-center overflow-x-clip px-4 py-10 sm:px-6 sm:py-14 lg:py-16">
+    <header className="relative flex min-h-[100svh] items-center justify-center overflow-x-clip px-6 py-10 sm:px-8 sm:py-14 lg:py-16">
       {/* Ilustrações principais */}
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <Image
@@ -12,7 +13,7 @@ export function Hero() {
           alt=""
           width={420}
           height={340}
-          className="absolute top-1 left-0 w-28 opacity-60 sm:top-4 sm:left-2 sm:w-40 lg:top-6 lg:left-6 lg:w-56 lg:opacity-70 xl:w-64"
+          className="absolute top-0 left-0 w-28 opacity-60 sm:top-2 sm:w-40 lg:-left-2 lg:top-0 lg:w-72 lg:opacity-75 xl:-left-4 xl:w-[22rem]"
           priority
         />
         <Image
@@ -28,9 +29,11 @@ export function Hero() {
           alt=""
           width={420}
           height={340}
-          className="absolute right-0 bottom-6 w-24 rotate-180 opacity-50 sm:right-2 sm:bottom-10 sm:w-36 lg:right-8 lg:bottom-8 lg:w-52 lg:opacity-65 xl:w-60"
+          className="absolute right-0 bottom-4 w-24 rotate-180 opacity-50 sm:bottom-8 sm:w-36 lg:-right-2 lg:bottom-4 lg:w-72 lg:opacity-70 xl:-right-4 xl:w-[22rem]"
         />
       </div>
+
+      <ChaseBee />
 
       <div className="relative z-10 w-full max-w-[22.5rem] sm:max-w-md lg:max-w-lg">
         <div className="animate-rise relative rounded-[1.75rem] bg-white/95 px-5 pb-7 pt-8 text-center shadow-[0_18px_50px_-28px_rgba(94,75,60,0.45)] backdrop-blur-[2px] sm:rounded-[2rem] sm:px-8 sm:pb-8 sm:pt-10 lg:px-10 lg:pt-11 lg:pb-9">
@@ -55,7 +58,7 @@ export function Hero() {
               alt=""
               width={64}
               height={64}
-              className="illus-interactive illus-bee absolute -top-4 right-2 h-7 w-auto sm:right-4 sm:h-8"
+              className="illus-bee pointer-events-none absolute -top-4 right-2 h-7 w-auto select-none sm:right-4 sm:h-8"
             />
             <p className="font-display text-[0.85rem] text-ink sm:text-[0.95rem]">
               <span className="italic">Sábado</span>
@@ -90,7 +93,7 @@ export function Hero() {
           width={510}
           height={864}
           priority
-          className="illus-interactive illus-duck absolute -bottom-2 -left-6 z-20 w-[42%] max-w-[150px] select-none sm:-bottom-3 sm:-left-10 sm:max-w-[180px] lg:-left-14 lg:max-w-[210px]"
+          className="illus-interactive illus-duck absolute -bottom-2 -left-3 z-20 w-[40%] max-w-[136px] select-none sm:-bottom-3 sm:-left-8 sm:max-w-[180px] lg:-left-12 lg:max-w-[210px]"
         />
       </div>
     </header>

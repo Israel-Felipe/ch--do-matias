@@ -5,6 +5,8 @@ export type Gift = {
   category: string | null;
   notes: string | null;
   link: string | null;
+  /** Preço médio estimado em BRL (opcional). */
+  avg_price: number | null;
   claimed_by: string | null;
   claimed_at: string | null;
   sort_order: number;
@@ -17,6 +19,7 @@ export type GiftInput = {
   category?: string | null;
   notes?: string | null;
   link?: string | null;
+  avg_price?: number | null;
   sort_order?: number;
 };
 
@@ -49,6 +52,7 @@ export type EventInfo = {
   mapsUrl: string;
   rsvpLabel: string;
   intro: string;
+  pixKey: string;
   verse: string;
   verseReference: string;
 };

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Gift, Loader2, Search } from "lucide-react";
+import { Check, Copy, ExternalLink, Gift, Loader2, Search } from "lucide-react";
 import type { Gift as GiftType } from "@/lib/types";
+import { eventInfo } from "@/lib/seed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +16,60 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, formatAvgPrice } from "@/lib/utils";
 
 type Filter = "all" | "available" | "claimed";
 type DialogMode = "claim" | "release";
+
+function PixNotice() {
+  const [copied, setCopied] = useState(false);
+
+  async function copyPix() {
+    try {
+      await navigator.clipboard.writeText(eventInfo.pixKey);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="rounded-[1.5rem] bg-gradient-to-br from-copper/15 via-butter/25 to-sage-soft/40 px-5 py-6 text-center ring-1 ring-copper/30 sm:px-7 sm:py-7">
+      <p className="font-display text-xl leading-snug text-ink sm:text-2xl">
+        Essa lista não te atendeu?
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft sm:text-base">
+        Você também pode presentear via PIX
+      </p>
+      <button
+        type="button"
+        onClick={() => void copyPix()}
+        className="mx-auto mt-5 flex w-full max-w-xs flex-col items-center gap-1 rounded-2xl bg-white/90 px-4 py-3.5 shadow-[0_10px_28px_-18px_rgba(94,75,60,0.55)] ring-1 ring-copper/20 transition hover:bg-white active:scale-[0.99]"
+      >
+        <span className="text-[0.65rem] font-bold tracking-[0.22em] text-copper uppercase">
+          Chave PIX (CPF)
+        </span>
+        <span className="font-body text-xl font-bold tracking-wide text-ink sm:text-2xl">
+          {eventInfo.pixKey}
+        </span>
+        <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+          {copied ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-sage" />
+              Copiado!
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              Toque para copiar
+            </>
+          )}
+        </span>
+      </button>
+    </div>
+  );
+}
 
 export function GiftList() {
   const [gifts, setGifts] = useState<GiftType[]>([]);
@@ -273,6 +324,11 @@ export function GiftList() {
                               {gift.brand}
                             </span>
                           ) : null}
+                          {formatAvgPrice(gift.avg_price) ? (
+                            <span className="mt-0.5 block text-xs text-ink-soft">
+                              Preço médio ≈ {formatAvgPrice(gift.avg_price)}
+                            </span>
+                          ) : null}
                           {gift.notes ? (
                             <span className="mt-0.5 block text-xs text-ink-soft">
                               {gift.notes}
@@ -331,6 +387,10 @@ export function GiftList() {
               })}
             </ul>
           )}
+        </div>
+
+        <div className="mt-8">
+          <PixNotice />
         </div>
       </div>
 

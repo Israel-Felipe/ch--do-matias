@@ -20,6 +20,7 @@ export async function PATCH(request: Request, context: Ctx) {
       category?: string | null;
       notes?: string | null;
       link?: string | null;
+      avg_price?: number | null;
       sort_order?: number;
       release?: boolean;
     };
@@ -38,6 +39,7 @@ export async function PATCH(request: Request, context: Ctx) {
       category: body.category,
       notes: body.notes,
       link: body.link,
+      avg_price: body.avg_price,
       sort_order: body.sort_order,
     });
 

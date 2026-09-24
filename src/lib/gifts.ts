@@ -40,6 +40,7 @@ export async function listGifts(): Promise<Gift[]> {
     category: g.category,
     notes: g.notes,
     link: g.link,
+    avg_price: g.avg_price,
     sort_order: g.sort_order,
   }));
 
@@ -74,6 +75,10 @@ export async function createGift(input: GiftInput): Promise<Gift> {
       category: input.category?.trim() || null,
       notes: input.notes?.trim() || null,
       link: input.link?.trim() || null,
+      avg_price:
+        input.avg_price == null || Number.isNaN(Number(input.avg_price))
+          ? null
+          : Number(input.avg_price),
       sort_order,
     })
     .select("*")
@@ -86,7 +91,7 @@ export async function createGift(input: GiftInput): Promise<Gift> {
 export async function updateGift(
   id: string,
   patch: Partial<
-    Pick<Gift, "title" | "brand" | "category" | "notes" | "link" | "sort_order">
+    Pick<Gift, "title" | "brand" | "category" | "notes" | "link" | "avg_price" | "sort_order">
   >,
 ): Promise<Gift | null> {
   if (getDataMode() === "local") return localUpdateGift(id, patch);
@@ -107,6 +112,12 @@ export async function updateGift(
         patch.notes === undefined ? undefined : patch.notes?.trim() || null,
       link:
         patch.link === undefined ? undefined : patch.link?.trim() || null,
+      avg_price:
+        patch.avg_price === undefined
+          ? undefined
+          : patch.avg_price == null || Number.isNaN(Number(patch.avg_price))
+            ? null
+            : Number(patch.avg_price),
     })
     .eq("id", id)
     .select("*")

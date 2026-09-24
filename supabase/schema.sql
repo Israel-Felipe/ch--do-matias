@@ -10,6 +10,7 @@ create table if not exists public.gifts (
   category text,
   notes text,
   link text,
+  avg_price numeric(10, 2),
   claimed_by text,
   claimed_at timestamptz,
   sort_order integer not null default 0,

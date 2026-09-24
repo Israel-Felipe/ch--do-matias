@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       category?: string | null;
       notes?: string | null;
       link?: string | null;
+      avg_price?: number | null;
     };
 
     if (!body.title?.trim()) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       category: body.category,
       notes: body.notes,
       link: body.link,
+      avg_price: body.avg_price,
     });
 
     return NextResponse.json({ gift }, { status: 201 });

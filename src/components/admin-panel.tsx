@@ -21,6 +21,7 @@ export function AdminPanel() {
   const [brand, setBrand] = useState("");
   const [notes, setNotes] = useState("");
   const [link, setLink] = useState("");
+  const [avgPrice, setAvgPrice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -103,7 +104,13 @@ export function AdminPanel() {
     const res = await fetch("/api/gifts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, brand, notes, link }),
+      body: JSON.stringify({
+        title,
+        brand,
+        notes,
+        link,
+        avg_price: avgPrice.trim() === "" ? null : Number(avgPrice.replace(",", ".")),
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -114,8 +121,35 @@ export function AdminPanel() {
     setBrand("");
     setNotes("");
     setLink("");
+    setAvgPrice("");
     setMessage("Item adicionado.");
     await loadGifts();
+  }
+
+  async function handlePriceBlur(id: string, raw: string) {
+    const trimmed = raw.trim();
+    const avg_price =
+      trimmed === "" ? null : Number(trimmed.replace(",", "."));
+    if (avg_price != null && Number.isNaN(avg_price)) {
+      setMessage("Preço inválido");
+      return;
+    }
+    setBusyId(id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/gifts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avg_price }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar preço");
+      setGifts((prev) => prev.map((g) => (g.id === id ? data.gift : g)));
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar preço");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function handleRelease(id: string) {
@@ -253,15 +287,26 @@ export function AdminPanel() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notes">Observação</Label>
+            <Label htmlFor="avgPrice">Preço médio (R$)</Label>
             <Input
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              id="avgPrice"
+              inputMode="decimal"
+              value={avgPrice}
+              onChange={(e) => setAvgPrice(e.target.value)}
               className="h-12 rounded-2xl text-base"
-              placeholder="Opcional"
+              placeholder="Ex.: 49,90"
             />
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="notes">Observação</Label>
+          <Input
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="h-12 rounded-2xl text-base"
+            placeholder="Opcional"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="link">Link de referência</Label>
@@ -352,6 +397,26 @@ export function AdminPanel() {
                   {gift.notes ? (
                     <p className="mt-1 text-xs text-ink-soft">{gift.notes}</p>
                   ) : null}
+                  <div className="mt-2 flex max-w-[12rem] items-center gap-2">
+                    <Label
+                      htmlFor={`price-${gift.id}`}
+                      className="shrink-0 text-xs text-ink-soft"
+                    >
+                      Preço médio
+                    </Label>
+                    <Input
+                      id={`price-${gift.id}`}
+                      inputMode="decimal"
+                      defaultValue={
+                        gift.avg_price == null ? "" : String(gift.avg_price)
+                      }
+                      key={`${gift.id}-${gift.avg_price ?? "empty"}`}
+                      disabled={busyId === gift.id}
+                      className="h-9 rounded-xl text-sm"
+                      placeholder="R$"
+                      onBlur={(e) => void handlePriceBlur(gift.id, e.target.value)}
+                    />
+                  </div>
                   {gift.claimed_by ? (
                     <p className="mt-1 text-sm text-ink-soft">
                       Reservado por <strong>{gift.claimed_by}</strong>
