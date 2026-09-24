@@ -332,36 +332,6 @@ export function GiftList() {
                 </button>
               ))}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <Label htmlFor="price-min" className="text-xs text-ink-soft">
-                  De (R$)
-                </Label>
-                <Input
-                  id="price-min"
-                  inputMode="decimal"
-                  value={priceMin}
-                  onChange={(e) => setPriceMin(e.target.value)}
-                  placeholder="ex.: 50"
-                  className="h-11 rounded-2xl border-border/80 bg-white/80 text-base shadow-none"
-                  aria-label="Preço mínimo"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="price-max" className="text-xs text-ink-soft">
-                  Até (R$)
-                </Label>
-                <Input
-                  id="price-max"
-                  inputMode="decimal"
-                  value={priceMax}
-                  onChange={(e) => setPriceMax(e.target.value)}
-                  placeholder="ex.: 100"
-                  className="h-11 rounded-2xl border-border/80 bg-white/80 text-base shadow-none"
-                  aria-label="Preço máximo"
-                />
-              </div>
-            </div>
           </div>
         </div>
 
