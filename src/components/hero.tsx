@@ -20,7 +20,7 @@ export function Hero() {
           alt=""
           width={280}
           height={280}
-          className="animate-soft-pulse absolute top-3 right-2 w-14 opacity-90 sm:top-6 sm:right-6 sm:w-20 lg:top-8 lg:right-12 lg:w-32 xl:w-36"
+          className="illus-interactive illus-sun animate-soft-pulse absolute top-3 right-2 w-14 opacity-90 sm:top-6 sm:right-6 sm:w-20 lg:top-8 lg:right-12 lg:w-32 xl:w-36"
           priority
         />
         <Image
@@ -28,7 +28,7 @@ export function Hero() {
           alt=""
           width={120}
           height={120}
-          className="absolute top-[22%] right-[18%] hidden w-14 opacity-80 lg:block xl:right-[22%] xl:w-16"
+          className="illus-interactive illus-bee absolute top-[22%] right-[18%] hidden w-14 opacity-80 lg:block xl:right-[22%] xl:w-16"
         />
         <Image
           src="/images/folhas.png"
@@ -62,7 +62,7 @@ export function Hero() {
               alt=""
               width={64}
               height={64}
-              className="absolute -top-4 right-2 h-7 w-auto sm:right-4 sm:h-8"
+              className="illus-interactive illus-bee absolute -top-4 right-2 h-7 w-auto sm:right-4 sm:h-8"
             />
             <p className="font-display text-[0.85rem] text-ink sm:text-[0.95rem]">
               <span className="italic">Sábado</span>
@@ -97,7 +97,7 @@ export function Hero() {
           width={510}
           height={864}
           priority
-          className="pointer-events-none absolute -bottom-2 -left-6 z-20 w-[42%] max-w-[150px] select-none sm:-bottom-3 sm:-left-10 sm:max-w-[180px] lg:-left-14 lg:max-w-[210px]"
+          className="illus-interactive illus-duck absolute -bottom-2 -left-6 z-20 w-[42%] max-w-[150px] select-none sm:-bottom-3 sm:-left-10 sm:max-w-[180px] lg:-left-14 lg:max-w-[210px]"
         />
       </div>
     </header>

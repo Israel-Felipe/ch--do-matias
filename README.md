@@ -46,11 +46,14 @@ cp .env.example .env.local
 
 Com as chaves do Supabase preenchidas, o app passa a usar o banco automaticamente (sem mudar código).
 
+**Integração Vercel ↔ Supabase:** a Vercel cria nomes como `SUPABASE_SECRET_KEY` e `NEXT_PUBLIC_SUPABASE_URL`. O app já aceita esses nomes. Ainda assim é obrigatório rodar o [`supabase/schema.sql`](supabase/schema.sql) no SQL Editor do projeto (a integração não cria as tabelas sozinha).
+
 ### 4. Publicar (ex.: Vercel)
 
 1. Importe o repo na [Vercel](https://vercel.com)
-2. Cole as mesmas variáveis de ambiente
-3. Deploy → compartilhe a URL com os convidados
+2. Conecte o Supabase (Marketplace) **ou** cole as variáveis manualmente
+3. Rode o `schema.sql` no Supabase
+4. Redeploy → compartilhe a URL com os convidados
 
 Na hora de conectar, peça ajuda no chat do agent — dá para ir passo a passo.
 

@@ -7,7 +7,13 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import type { Rsvp, RsvpInput } from "@/lib/types";
 
 function mode(): "supabase" | "local" {
-  return isSupabaseConfigured() ? "supabase" : "local";
+  if (isSupabaseConfigured()) return "supabase";
+  if (process.env.VERCEL) {
+    throw new Error(
+      "Supabase não configurado. Na Vercel confira NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SECRET_KEY (integração) ou SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
+  return "local";
 }
 
 export async function listRsvps(): Promise<Rsvp[]> {

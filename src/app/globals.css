@@ -175,6 +175,30 @@
   .animate-soft-pulse {
     animation: soft-pulse 3.5s ease-in-out infinite;
   }
+
+  .illus-interactive {
+    pointer-events: auto;
+    cursor: default;
+    will-change: transform;
+  }
+
+  .illus-duck {
+    transform-origin: 50% 90%;
+  }
+  .illus-duck:hover {
+    animation: duck-wobble 0.85s ease-in-out;
+  }
+
+  .illus-bee:hover {
+    animation: bee-loop 1.1s ease-in-out;
+  }
+
+  .illus-sun {
+    transform-origin: center;
+  }
+  .illus-sun:hover {
+    animation: sun-zoom 0.95s ease-in-out;
+  }
 }
 
 @keyframes rise {
@@ -198,11 +222,64 @@
   }
 }
 
+@keyframes duck-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-10deg);
+  }
+  40% {
+    transform: rotate(9deg);
+  }
+  60% {
+    transform: rotate(-7deg);
+  }
+  80% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes bee-loop {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -8px) rotate(18deg);
+  }
+  50% {
+    transform: translate(0, -14px) rotate(-12deg);
+  }
+  75% {
+    transform: translate(-10px, -6px) rotate(14deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes sun-zoom {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.22);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-delay,
   .animate-rise-delay-2,
-  .animate-soft-pulse {
+  .animate-soft-pulse,
+  .illus-duck:hover,
+  .illus-bee:hover,
+  .illus-sun:hover {
     animation: none !important;
   }
 }

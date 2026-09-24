@@ -6,11 +6,18 @@ import {
   localReleaseGift,
   localUpdateGift,
 } from "@/lib/local-store";
+import { seedGifts } from "@/lib/seed";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import type { Gift, GiftInput } from "@/lib/types";
 
 export function getDataMode(): "supabase" | "local" {
-  return isSupabaseConfigured() ? "supabase" : "local";
+  if (isSupabaseConfigured()) return "supabase";
+  if (process.env.VERCEL) {
+    throw new Error(
+      "Supabase não configurado. Na Vercel confira NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SECRET_KEY (integração) ou SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
+  return "local";
 }
 
 export async function listGifts(): Promise<Gift[]> {
@@ -23,7 +30,27 @@ export async function listGifts(): Promise<Gift[]> {
     .order("sort_order", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as Gift[];
+
+  if (data && data.length > 0) return data as Gift[];
+
+  // Primeira carga: popula a lista do seed (como no modo local).
+  const rows = seedGifts.map((g) => ({
+    title: g.title,
+    brand: g.brand,
+    category: g.category,
+    notes: g.notes,
+    link: g.link,
+    sort_order: g.sort_order,
+  }));
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("gifts")
+    .insert(rows)
+    .select("*")
+    .order("sort_order", { ascending: true });
+
+  if (insertError) throw new Error(insertError.message);
+  return (inserted ?? []) as Gift[];
 }
 
 export async function createGift(input: GiftInput): Promise<Gift> {
