@@ -11,6 +11,7 @@ export const eventInfo: EventInfo = {
   addressStreet: "Rua Enf. Walli Malschitzky, 164",
   mapsUrl: "https://maps.app.goo.gl/dfFvcQBv1AEVsS5w5",
   rsvpLabel: "Confirme sua presença até 14/10",
+  childMaxAge: 10,
   intro:
     "Lista para o enxoval do Matias. Ao escolher um presente, deixe seu nome no item para evitar repetidos. Os links são só referência — pode comprar em outra loja, mantendo a marca quando possível. Temos também alguns itens mais caros; se preferir presentear com um PIX para ajudar a comprá-los, ao invés de um item da lista, a chave está no final da página. A presença de vocês é o que mais importa.",
   pixKey: "09565560946",

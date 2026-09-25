@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, LogOut, Pencil, Plus, Trash2, Unlock, X } from "lucide-react";
-import type { Gift, Rsvp } from "@/lib/types";
+import type { Gift, Rsvp, RsvpStatus } from "@/lib/types";
+import { eventInfo } from "@/lib/seed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 type GiftDraft = {
   title: string;
@@ -24,6 +26,16 @@ type GiftDraft = {
   avg_price: string;
 };
 
+type RsvpDraft = {
+  name: string;
+  status: RsvpStatus;
+  adults: string;
+  children: string;
+  bringing: boolean;
+  bringing_what: string;
+  note: string;
+};
+
 function giftToDraft(gift: Gift): GiftDraft {
   return {
     title: gift.title,
@@ -31,6 +43,18 @@ function giftToDraft(gift: Gift): GiftDraft {
     notes: gift.notes ?? "",
     link: gift.link ?? "",
     avg_price: gift.avg_price == null ? "" : String(gift.avg_price),
+  };
+}
+
+function rsvpToDraft(rsvp: Rsvp): RsvpDraft {
+  return {
+    name: rsvp.name,
+    status: rsvp.status,
+    adults: String(rsvp.adults ?? rsvp.guests ?? 0),
+    children: String(rsvp.children ?? 0),
+    bringing: Boolean(rsvp.bringing),
+    bringing_what: rsvp.bringing_what ?? "",
+    note: rsvp.note ?? "",
   };
 }
 
@@ -50,6 +74,8 @@ export function AdminPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<GiftDraft | null>(null);
+  const [editingRsvpId, setEditingRsvpId] = useState<string | null>(null);
+  const [rsvpDraft, setRsvpDraft] = useState<RsvpDraft | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -111,6 +137,74 @@ export function AdminPanel() {
     setRsvps([]);
     setEditingId(null);
     setDraft(null);
+    setEditingRsvpId(null);
+    setRsvpDraft(null);
+  }
+
+  function startEditRsvp(rsvp: Rsvp) {
+    setEditingRsvpId(rsvp.id);
+    setRsvpDraft(rsvpToDraft(rsvp));
+    setEditingId(null);
+    setDraft(null);
+    setMessage(null);
+  }
+
+  function cancelEditRsvp() {
+    setEditingRsvpId(null);
+    setRsvpDraft(null);
+  }
+
+  async function handleSaveRsvp(id: string) {
+    if (!rsvpDraft) return;
+    if (!rsvpDraft.name.trim()) {
+      setMessage("Nome obrigatório");
+      return;
+    }
+
+    const adults =
+      rsvpDraft.status === "no" ? 0 : Number(rsvpDraft.adults) || 0;
+    const children =
+      rsvpDraft.status === "no" ? 0 : Number(rsvpDraft.children) || 0;
+
+    if (rsvpDraft.status !== "no" && adults + children < 1) {
+      setMessage("Informe ao menos 1 pessoa");
+      return;
+    }
+
+    const bringing =
+      rsvpDraft.status === "yes" ? rsvpDraft.bringing : false;
+    if (bringing && !rsvpDraft.bringing_what.trim()) {
+      setMessage("Informe o que vai levar");
+      return;
+    }
+
+    setBusyId(id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/rsvps/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: rsvpDraft.name,
+          status: rsvpDraft.status,
+          adults,
+          children,
+          note: rsvpDraft.note.trim() || null,
+          bringing,
+          bringing_what: bringing ? rsvpDraft.bringing_what : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
+      setRsvps((prev) => prev.map((r) => (r.id === id ? data.rsvp : r)));
+      setEditingRsvpId(null);
+      setRsvpDraft(null);
+      setMessage("Presença atualizada.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar RSVP");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function handleDeleteRsvp(id: string) {
@@ -121,6 +215,7 @@ export function AdminPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao remover");
       setRsvps((prev) => prev.filter((r) => r.id !== id));
+      if (editingRsvpId === id) cancelEditRsvp();
       setMessage("Confirmação removida.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao remover RSVP");
@@ -167,6 +262,8 @@ export function AdminPanel() {
   function startEdit(gift: Gift) {
     setEditingId(gift.id);
     setDraft(giftToDraft(gift));
+    setEditingRsvpId(null);
+    setRsvpDraft(null);
     setMessage(null);
   }
 
@@ -335,44 +432,278 @@ export function AdminPanel() {
         <h2 className="font-display text-lg text-ink">
           Presenças ({rsvps.length})
         </h2>
+        {rsvps.some((r) => r.status === "yes") ? (
+          <p className="mt-1 text-sm text-ink-soft">
+            Confirmados:{" "}
+            {rsvps
+              .filter((r) => r.status === "yes")
+              .reduce((sum, r) => sum + (r.adults ?? r.guests), 0)}{" "}
+            adulto(s) ·{" "}
+            {rsvps
+              .filter((r) => r.status === "yes")
+              .reduce((sum, r) => sum + (r.children ?? 0), 0)}{" "}
+            criança(s)
+          </p>
+        ) : null}
         <ul className="mt-3 space-y-2">
           {rsvps.length === 0 ? (
             <li className="rounded-2xl bg-card/90 p-4 text-sm text-ink-soft ring-1 ring-border/60">
               Nenhuma confirmação ainda.
             </li>
           ) : (
-            rsvps.map((rsvp) => (
+            rsvps.map((rsvp) => {
+              const editing = editingRsvpId === rsvp.id ? rsvpDraft : null;
+
+              return (
               <li
                 key={rsvp.id}
-                className="flex flex-col gap-3 rounded-2xl bg-card/90 p-4 ring-1 ring-border/60 sm:flex-row sm:items-center sm:justify-between"
+                className="rounded-2xl bg-card/90 p-4 ring-1 ring-border/60"
               >
-                <div>
-                  <p className="font-display text-base text-ink">{rsvp.name}</p>
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {rsvp.status === "yes"
-                      ? "Vai"
-                      : rsvp.status === "maybe"
-                        ? "Talvez"
-                        : "Não vai"}
-                    {rsvp.status !== "no" ? ` · ${rsvp.guests} pessoa(s)` : null}
-                    {rsvp.bringing && rsvp.bringing_what
-                      ? ` · Leva: ${rsvp.bringing_what}`
-                      : null}
-                    {rsvp.note ? ` · ${rsvp.note}` : null}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="h-11 rounded-full"
-                  disabled={busyId === rsvp.id}
-                  onClick={() => void handleDeleteRsvp(rsvp.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remover
-                </Button>
+                {editing ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`rsvp-name-${rsvp.id}`}>Nome</Label>
+                      <Input
+                        id={`rsvp-name-${rsvp.id}`}
+                        value={editing.name}
+                        onChange={(e) =>
+                          setRsvpDraft((d) =>
+                            d ? { ...d, name: e.target.value } : d,
+                          )
+                        }
+                        className="h-11 rounded-2xl text-base"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(
+                          [
+                            { value: "yes" as const, label: "Vai" },
+                            { value: "no" as const, label: "Não vai" },
+                          ]
+                        ).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() =>
+                              setRsvpDraft((d) => {
+                                if (!d) return d;
+                                const next = { ...d, status: opt.value };
+                                if (opt.value !== "yes") {
+                                  next.bringing = false;
+                                  next.bringing_what = "";
+                                }
+                                if (opt.value === "no") {
+                                  next.adults = "0";
+                                  next.children = "0";
+                                } else if (d.status === "no") {
+                                  next.adults = "1";
+                                  next.children = "0";
+                                }
+                                return next;
+                              })
+                            }
+                            className={cn(
+                              "min-h-11 rounded-2xl px-3 text-sm font-semibold transition",
+                              editing.status === opt.value
+                                ? "bg-ink text-cream"
+                                : "bg-cream-deep/80 text-ink-soft ring-1 ring-border/60",
+                            )}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {editing.status !== "no" ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor={`rsvp-adults-${rsvp.id}`}>Adultos</Label>
+                          <Input
+                            id={`rsvp-adults-${rsvp.id}`}
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={editing.adults}
+                            onChange={(e) =>
+                              setRsvpDraft((d) =>
+                                d ? { ...d, adults: e.target.value } : d,
+                              )
+                            }
+                            className="h-11 rounded-2xl text-base"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`rsvp-children-${rsvp.id}`}>
+                            Crianças (até {eventInfo.childMaxAge} anos)
+                          </Label>
+                          <Input
+                            id={`rsvp-children-${rsvp.id}`}
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={editing.children}
+                            onChange={(e) =>
+                              setRsvpDraft((d) =>
+                                d ? { ...d, children: e.target.value } : d,
+                              )
+                            }
+                            className="h-11 rounded-2xl text-base"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editing.status === "yes" ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-cream-deep/50 px-3.5 py-3 ring-1 ring-border/50">
+                          <Label
+                            htmlFor={`rsvp-bringing-${rsvp.id}`}
+                            className="cursor-pointer text-sm font-normal text-ink-soft"
+                          >
+                            Vai levar salgado, doce ou bebida
+                          </Label>
+                          <button
+                            id={`rsvp-bringing-${rsvp.id}`}
+                            type="button"
+                            role="switch"
+                            aria-checked={editing.bringing}
+                            onClick={() =>
+                              setRsvpDraft((d) => {
+                                if (!d) return d;
+                                const next = !d.bringing;
+                                return {
+                                  ...d,
+                                  bringing: next,
+                                  bringing_what: next ? d.bringing_what : "",
+                                };
+                              })
+                            }
+                            className={cn(
+                              "relative h-6 w-10 shrink-0 rounded-full transition-colors",
+                              editing.bringing ? "bg-sage" : "bg-border",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                                editing.bringing && "translate-x-4",
+                              )}
+                            />
+                          </button>
+                        </div>
+                        {editing.bringing ? (
+                          <div className="space-y-2">
+                            <Label htmlFor={`rsvp-bring-what-${rsvp.id}`}>
+                              O que vai levar?
+                            </Label>
+                            <Input
+                              id={`rsvp-bring-what-${rsvp.id}`}
+                              value={editing.bringing_what}
+                              onChange={(e) =>
+                                setRsvpDraft((d) =>
+                                  d
+                                    ? { ...d, bringing_what: e.target.value }
+                                    : d,
+                                )
+                              }
+                              className="h-11 rounded-2xl text-base"
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`rsvp-note-${rsvp.id}`}>Recado</Label>
+                      <Input
+                        id={`rsvp-note-${rsvp.id}`}
+                        value={editing.note}
+                        onChange={(e) =>
+                          setRsvpDraft((d) =>
+                            d ? { ...d, note: e.target.value } : d,
+                          )
+                        }
+                        className="h-11 rounded-2xl text-base"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="h-11 rounded-full"
+                        disabled={busyId === rsvp.id}
+                        onClick={() => void handleSaveRsvp(rsvp.id)}
+                      >
+                        {busyId === rsvp.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 rounded-full"
+                        disabled={busyId === rsvp.id}
+                        onClick={cancelEditRsvp}
+                      >
+                        <X className="h-4 w-4" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-display text-base text-ink">{rsvp.name}</p>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        {rsvp.status === "yes"
+                          ? "Vai"
+                          : rsvp.status === "maybe"
+                            ? "Talvez"
+                            : "Não vai"}
+                        {rsvp.status !== "no"
+                          ? ` · ${rsvp.adults ?? rsvp.guests} adulto(s)` +
+                            ` · ${rsvp.children ?? 0} criança(s)`
+                          : null}
+                        {rsvp.bringing && rsvp.bringing_what
+                          ? ` · Leva: ${rsvp.bringing_what}`
+                          : null}
+                        {rsvp.note ? ` · ${rsvp.note}` : null}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-nowrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 rounded-full"
+                        disabled={busyId === rsvp.id}
+                        onClick={() => startEditRsvp(rsvp)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="h-11 rounded-full"
+                        disabled={busyId === rsvp.id}
+                        onClick={() => void handleDeleteRsvp(rsvp.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </li>
-            ))
+              );
+            })
           )}
         </ul>
       </div>

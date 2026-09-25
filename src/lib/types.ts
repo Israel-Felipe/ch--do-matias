@@ -28,7 +28,10 @@ export type RsvpStatus = "yes" | "no" | "maybe";
 export type Rsvp = {
   id: string;
   name: string;
+  /** Total de pessoas (adultos + crianças). Mantido para compatibilidade. */
   guests: number;
+  adults: number;
+  children: number;
   status: RsvpStatus;
   note: string | null;
   bringing: boolean;
@@ -39,6 +42,8 @@ export type Rsvp = {
 export type RsvpInput = {
   name: string;
   guests?: number;
+  adults?: number;
+  children?: number;
   status: RsvpStatus;
   note?: string | null;
   bringing?: boolean;
@@ -56,6 +61,8 @@ export type EventInfo = {
   addressStreet: string;
   mapsUrl: string;
   rsvpLabel: string;
+  /** Idade máxima considerada criança no RSVP. */
+  childMaxAge: number;
   intro: string;
   pixKey: string;
   verse: string;

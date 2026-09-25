@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { normalizeGuestCounts } from "@/lib/rsvp-counts";
 import type { Rsvp, RsvpInput } from "@/lib/types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -20,7 +21,11 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
 async function ensureStore(): Promise<Rsvp[]> {
   try {
     const raw = await fs.readFile(DATA_FILE, "utf8");
-    return JSON.parse(raw) as Rsvp[];
+    return (JSON.parse(raw) as Rsvp[]).map((r) => ({
+      ...r,
+      adults: r.adults ?? r.guests ?? 0,
+      children: r.children ?? 0,
+    }));
   } catch {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(DATA_FILE, "[]", "utf8");
@@ -46,22 +51,52 @@ export async function localListRsvps(): Promise<Rsvp[]> {
 export async function localCreateRsvp(input: RsvpInput): Promise<Rsvp> {
   return enqueue(async () => {
     const rsvps = await ensureStore();
+    const counts = normalizeGuestCounts(input);
+    const bringing = input.status === "yes" ? Boolean(input.bringing) : false;
     const rsvp: Rsvp = {
       id: randomUUID(),
       name: input.name.trim(),
-      guests: Math.max(1, Math.min(20, Math.floor(input.guests ?? 1))),
+      guests: counts.guests,
+      adults: counts.adults,
+      children: counts.children,
       status: input.status,
       note: input.note?.trim() || null,
-      bringing: input.status === "yes" ? Boolean(input.bringing) : false,
+      bringing,
       bringing_what:
-        input.status === "yes" && input.bringing
-          ? input.bringing_what?.trim() || null
-          : null,
+        bringing ? input.bringing_what?.trim() || null : null,
       created_at: new Date().toISOString(),
     };
     rsvps.push(rsvp);
     await persist(rsvps);
     return rsvp;
+  });
+}
+
+export async function localUpdateRsvp(
+  id: string,
+  input: RsvpInput,
+): Promise<Rsvp | null> {
+  return enqueue(async () => {
+    const rsvps = await ensureStore();
+    const idx = rsvps.findIndex((r) => r.id === id);
+    if (idx === -1) return null;
+
+    const counts = normalizeGuestCounts(input);
+    const bringing = input.status === "yes" ? Boolean(input.bringing) : false;
+    rsvps[idx] = {
+      ...rsvps[idx],
+      name: input.name.trim(),
+      guests: counts.guests,
+      adults: counts.adults,
+      children: counts.children,
+      status: input.status,
+      note: input.note?.trim() || null,
+      bringing,
+      bringing_what:
+        bringing ? input.bringing_what?.trim() || null : null,
+    };
+    await persist(rsvps);
+    return rsvps[idx];
   });
 }
 

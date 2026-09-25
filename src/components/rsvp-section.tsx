@@ -17,7 +17,8 @@ const statusOptions: { value: RsvpStatus; label: string }[] = [
 
 export function RsvpSection() {
   const [name, setName] = useState("");
-  const [guests, setGuests] = useState("1");
+  const [adults, setAdults] = useState("1");
+  const [children, setChildren] = useState("0");
   const [status, setStatus] = useState<RsvpStatus>("yes");
   const [bringing, setBringing] = useState(false);
   const [bringingWhat, setBringingWhat] = useState("");
@@ -44,7 +45,8 @@ export function RsvpSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          guests: Number(guests) || 1,
+          adults: status === "no" ? 0 : Number(adults) || 0,
+          children: status === "no" ? 0 : Number(children) || 0,
           status,
           note,
           bringing: status === "yes" ? bringing : false,
@@ -55,7 +57,8 @@ export function RsvpSection() {
       if (!res.ok) throw new Error(data.error || "Não foi possível confirmar");
       setDone(true);
       setName("");
-      setGuests("1");
+      setAdults("1");
+      setChildren("0");
       setStatus("yes");
       setBringing(false);
       setBringingWhat("");
@@ -143,17 +146,35 @@ export function RsvpSection() {
             </div>
 
             {status !== "no" ? (
-              <div className="space-y-2">
-                <Label htmlFor="rsvp-guests">Quantas pessoas (incluindo você)?</Label>
-                <Input
-                  id="rsvp-guests"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={guests}
-                  onChange={(e) => setGuests(e.target.value)}
-                  className="h-12 rounded-2xl border-border/70 bg-card/80 text-base"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="rsvp-adults">Adultos</Label>
+                  <Input
+                    id="rsvp-adults"
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={adults}
+                    onChange={(e) => setAdults(e.target.value)}
+                    required
+                    className="h-12 rounded-2xl border-border/70 bg-card/80 text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rsvp-children">
+                    Crianças (até {eventInfo.childMaxAge} anos)
+                  </Label>
+                  <Input
+                    id="rsvp-children"
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={children}
+                    onChange={(e) => setChildren(e.target.value)}
+                    required
+                    className="h-12 rounded-2xl border-border/70 bg-card/80 text-base"
+                  />
+                </div>
               </div>
             ) : null}
 

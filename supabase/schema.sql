@@ -35,7 +35,9 @@ create policy "gifts_claim_if_free"
 create table if not exists public.rsvps (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  guests integer not null default 1 check (guests >= 1 and guests <= 20),
+  guests integer not null default 1 check (guests >= 0 and guests <= 40),
+  adults integer not null default 1 check (adults >= 0 and adults <= 20),
+  children integer not null default 0 check (children >= 0 and children <= 20),
   status text not null check (status in ('yes', 'no', 'maybe')),
   note text,
   bringing boolean not null default false,

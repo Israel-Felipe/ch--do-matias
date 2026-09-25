@@ -2,7 +2,9 @@ import {
   localCreateRsvp,
   localDeleteRsvp,
   localListRsvps,
+  localUpdateRsvp,
 } from "@/lib/rsvp-store";
+import { normalizeGuestCounts } from "@/lib/rsvp-counts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import type { Rsvp, RsvpInput } from "@/lib/types";
 
@@ -16,6 +18,21 @@ function mode(): "supabase" | "local" {
   return "local";
 }
 
+function buildRsvpPayload(input: RsvpInput) {
+  const counts = normalizeGuestCounts(input);
+  const bringing = input.status === "yes" ? Boolean(input.bringing) : false;
+  return {
+    name: input.name.trim(),
+    guests: counts.guests,
+    adults: counts.adults,
+    children: counts.children,
+    status: input.status,
+    note: input.note?.trim() || null,
+    bringing,
+    bringing_what: bringing ? input.bringing_what?.trim() || null : null,
+  };
+}
+
 export async function listRsvps(): Promise<Rsvp[]> {
   if (mode() === "local") return localListRsvps();
 
@@ -26,7 +43,11 @@ export async function listRsvps(): Promise<Rsvp[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as Rsvp[];
+  return ((data ?? []) as Rsvp[]).map((r) => ({
+    ...r,
+    adults: r.adults ?? r.guests ?? 0,
+    children: r.children ?? 0,
+  }));
 }
 
 export async function createRsvp(input: RsvpInput): Promise<Rsvp> {
@@ -34,26 +55,35 @@ export async function createRsvp(input: RsvpInput): Promise<Rsvp> {
 
   if (mode() === "local") return localCreateRsvp(input);
 
-  const bringing = input.status === "yes" ? Boolean(input.bringing) : false;
-  const bringingWhat =
-    bringing ? input.bringing_what?.trim() || null : null;
-
   const supabase = getSupabaseAdmin()!;
   const { data, error } = await supabase
     .from("rsvps")
-    .insert({
-      name: input.name.trim(),
-      guests: Math.max(1, Math.min(20, Math.floor(input.guests ?? 1))),
-      status: input.status,
-      note: input.note?.trim() || null,
-      bringing,
-      bringing_what: bringingWhat,
-    })
+    .insert(buildRsvpPayload(input))
     .select("*")
     .single();
 
   if (error) throw new Error(error.message);
   return data as Rsvp;
+}
+
+export async function updateRsvp(
+  id: string,
+  input: RsvpInput,
+): Promise<Rsvp | null> {
+  if (!input.name.trim()) throw new Error("Informe seu nome");
+
+  if (mode() === "local") return localUpdateRsvp(id, input);
+
+  const supabase = getSupabaseAdmin()!;
+  const { data, error } = await supabase
+    .from("rsvps")
+    .update(buildRsvpPayload(input))
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as Rsvp) ?? null;
 }
 
 export async function deleteRsvp(id: string): Promise<boolean> {
@@ -78,5 +108,7 @@ export function summarizeRsvps(rsvps: Rsvp[]) {
     maybeCount: maybe.length,
     noCount: no.length,
     guestsComing: yes.reduce((sum, r) => sum + r.guests, 0),
+    adultsComing: yes.reduce((sum, r) => sum + (r.adults ?? r.guests), 0),
+    childrenComing: yes.reduce((sum, r) => sum + (r.children ?? 0), 0),
   };
 }
