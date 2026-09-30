@@ -53,6 +53,12 @@ export type RsvpInput = {
   bringing_what?: string | null;
 };
 
+export type PixPledge = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
 export type EventInfo = {
   title: string;
   babyName: string;

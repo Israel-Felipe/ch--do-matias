@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, ImagePlus, Loader2, LogOut, Pencil, Plus, Trash2, Unlock, X } from "lucide-react";
-import type { Gift, Rsvp, RsvpStatus } from "@/lib/types";
+import type { Gift, PixPledge, Rsvp, RsvpStatus } from "@/lib/types";
 import { eventInfo } from "@/lib/seed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,7 @@ export function AdminPanel() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
+  const [pixPledges, setPixPledges] = useState<PixPledge[]>([]);
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
@@ -88,15 +89,18 @@ export function AdminPanel() {
   const loadGifts = useCallback(async () => {
     setLoading(true);
     try {
-      const [giftsRes, rsvpRes] = await Promise.all([
+      const [giftsRes, rsvpRes, pixRes] = await Promise.all([
         fetch("/api/gifts", { cache: "no-store" }),
         fetch("/api/rsvps", { cache: "no-store" }),
+        fetch("/api/pix-pledges", { cache: "no-store" }),
       ]);
       const giftsData = await giftsRes.json();
       const rsvpData = await rsvpRes.json();
+      const pixData = await pixRes.json();
       if (!giftsRes.ok) throw new Error(giftsData.error || "Erro ao carregar");
       setGifts(giftsData.gifts as Gift[]);
       if (rsvpRes.ok) setRsvps((rsvpData.rsvps as Rsvp[]) || []);
+      if (pixRes.ok) setPixPledges((pixData.pledges as PixPledge[]) || []);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao carregar");
     } finally {
@@ -140,6 +144,7 @@ export function AdminPanel() {
     setAuthed(false);
     setGifts([]);
     setRsvps([]);
+    setPixPledges([]);
     setEditingId(null);
     setDraft(null);
     setEditingRsvpId(null);
@@ -276,6 +281,22 @@ export function AdminPanel() {
       );
     } finally {
       setEnrichingImages(false);
+    }
+  }
+
+  async function handleDeletePixPledge(id: string) {
+    if (!confirm("Remover este registro de PIX?")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/pix-pledges/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao remover");
+      setPixPledges((prev) => prev.filter((p) => p.id !== id));
+      setMessage("Registro de PIX removido.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao remover PIX");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -762,6 +783,46 @@ export function AdminPanel() {
               </li>
               );
             })
+          )}
+        </ul>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="font-display text-lg text-ink">
+          PIX ({pixPledges.length})
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">
+          Pessoas que marcaram que vão contribuir via PIX.
+        </p>
+        <ul className="mt-3 space-y-2">
+          {pixPledges.length === 0 ? (
+            <li className="rounded-2xl bg-card/90 p-4 text-sm text-ink-soft ring-1 ring-border/60">
+              Ninguém marcou PIX ainda.
+            </li>
+          ) : (
+            pixPledges.map((pledge) => (
+              <li
+                key={pledge.id}
+                className="flex flex-col gap-3 rounded-2xl bg-card/90 p-4 ring-1 ring-border/60 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-display text-base text-ink">{pledge.name}</p>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    {new Date(pledge.created_at).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-11 rounded-full"
+                  disabled={busyId === pledge.id}
+                  onClick={() => void handleDeletePixPledge(pledge.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remover
+                </Button>
+              </li>
+            ))
           )}
         </ul>
       </div>

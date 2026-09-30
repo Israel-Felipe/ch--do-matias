@@ -23,6 +23,24 @@ type DialogMode = "claim" | "release";
 
 function PixGiftRow() {
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/pix-pledges", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok) setCount(Number(data.count) || 0);
+      } catch {
+        // silencioso
+      }
+    })();
+  }, []);
 
   async function copyPix() {
     try {
@@ -34,10 +52,46 @@ function PixGiftRow() {
     }
   }
 
+  async function handleConfirm() {
+    if (!name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/pix-pledges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível registrar");
+      setCount(Number(data.count) || count + 1);
+      setDone(true);
+      setName("");
+      try {
+        await navigator.clipboard.writeText(eventInfo.pixKey);
+        setCopied(true);
+      } catch {
+        // ok se clipboard falhar
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao registrar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <li>
       <div className="flex w-full items-start gap-3 px-4 py-4 text-left">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setDone(false);
+            setError(null);
+            setOpen(true);
+          }}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left active:opacity-80"
+        >
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pond text-ink">
             <Copy className="h-4 w-4" aria-hidden />
           </span>
@@ -52,10 +106,11 @@ function PixGiftRow() {
               Chave PIX: {eventInfo.pixKey}
             </span>
             <span className="mt-1 block text-xs font-semibold text-copper">
-              Sempre disponível
+              Toque para marcar · sempre disponível
+              {count > 0 ? ` · ${count} já marcaram` : ""}
             </span>
           </span>
-        </div>
+        </button>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <Badge
             variant="secondary"
@@ -82,6 +137,112 @@ function PixGiftRow() {
           </button>
         </div>
       </div>
+
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            setDone(false);
+            setError(null);
+            setName("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90svh] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto rounded-3xl border-border bg-card p-5 sm:p-6">
+          {done ? (
+            <>
+              <DialogHeader className="gap-2 text-left">
+                <DialogTitle className="font-display text-xl text-ink">
+                  Obrigado!
+                </DialogTitle>
+                <DialogDescription className="text-sm text-ink-soft">
+                  Registramos que você vai ajudar via PIX. A chave{" "}
+                  <strong className="text-ink">{eventInfo.pixKey}</strong>{" "}
+                  {copied ? "já foi copiada." : "está pronta para você copiar."}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-col gap-2 sm:flex-col">
+                {!copied ? (
+                  <Button
+                    type="button"
+                    className="h-12 w-full rounded-full text-base"
+                    onClick={() => void copyPix()}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copiar chave PIX
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full rounded-full"
+                  onClick={() => setOpen(false)}
+                >
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader className="gap-2 text-left">
+                <DialogTitle className="font-display text-xl text-ink">
+                  Marcar PIX
+                </DialogTitle>
+                <DialogDescription className="text-sm text-ink-soft">
+                  Deixe seu nome para sabermos que você vai contribuir via PIX.
+                  O item continua disponível para outras pessoas.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="pix-name" className="text-ink">
+                  Seu nome
+                </Label>
+                <Input
+                  id="pix-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex.: Ana Clara"
+                  className="h-12 rounded-2xl text-base"
+                  autoComplete="name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleConfirm();
+                  }}
+                />
+                {error ? (
+                  <p className="text-sm text-destructive">{error}</p>
+                ) : null}
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-col">
+                <Button
+                  type="button"
+                  className="h-12 w-full rounded-full text-base"
+                  disabled={!name.trim() || busy}
+                  onClick={() => void handleConfirm()}
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Aguarde...
+                    </>
+                  ) : (
+                    "Confirmar e copiar PIX"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full rounded-full"
+                  onClick={() => setOpen(false)}
+                >
+                  Cancelar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }
