@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Loader2, LogOut, Pencil, Plus, Trash2, Unlock, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, LogOut, Pencil, Plus, Trash2, Unlock, X } from "lucide-react";
 import type { Gift, Rsvp, RsvpStatus } from "@/lib/types";
 import { eventInfo } from "@/lib/seed";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ type GiftDraft = {
   brand: string;
   notes: string;
   link: string;
+  image_url: string;
   avg_price: string;
 };
 
@@ -42,6 +43,7 @@ function giftToDraft(gift: Gift): GiftDraft {
     brand: gift.brand ?? "",
     notes: gift.notes ?? "",
     link: gift.link ?? "",
+    image_url: gift.image_url ?? "",
     avg_price: gift.avg_price == null ? "" : String(gift.avg_price),
   };
 }
@@ -70,6 +72,7 @@ export function AdminPanel() {
   const [brand, setBrand] = useState("");
   const [notes, setNotes] = useState("");
   const [link, setLink] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [avgPrice, setAvgPrice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -78,6 +81,8 @@ export function AdminPanel() {
   const [rsvpDraft, setRsvpDraft] = useState<RsvpDraft | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [fetchingImage, setFetchingImage] = useState(false);
+  const [enrichingImages, setEnrichingImages] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const loadGifts = useCallback(async () => {
@@ -224,6 +229,56 @@ export function AdminPanel() {
     }
   }
 
+  async function fetchImageFromLink(
+    sourceLink: string,
+    onFound: (url: string) => void,
+  ) {
+    const url = sourceLink.trim();
+    if (!url) {
+      setMessage("Informe o link de referência antes de buscar a imagem.");
+      return;
+    }
+    setFetchingImage(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/link-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível buscar");
+      onFound(String(data.image_url));
+      setMessage("Imagem encontrada a partir do link.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao buscar imagem");
+    } finally {
+      setFetchingImage(false);
+    }
+  }
+
+  async function handleEnrichImages() {
+    setEnrichingImages(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/gifts/enrich-images", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao preencher imagens");
+      setMessage(
+        `Imagens: ${data.filled} preenchida(s)` +
+          (data.failed ? `, ${data.failed} sem preview` : "") +
+          ` de ${data.total} pendente(s).`,
+      );
+      await loadGifts();
+    } catch (err) {
+      setMessage(
+        err instanceof Error ? err.message : "Erro ao preencher imagens",
+      );
+    } finally {
+      setEnrichingImages(false);
+    }
+  }
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
@@ -237,6 +292,7 @@ export function AdminPanel() {
           brand,
           notes,
           link,
+          image_url: imageUrl.trim() || null,
           avg_price:
             avgPrice.trim() === "" ? null : Number(avgPrice.replace(",", ".")),
         }),
@@ -250,6 +306,7 @@ export function AdminPanel() {
       setBrand("");
       setNotes("");
       setLink("");
+      setImageUrl("");
       setAvgPrice("");
       setCreateOpen(false);
       setMessage("Item adicionado.");
@@ -298,6 +355,7 @@ export function AdminPanel() {
           brand: draft.brand.trim() || null,
           notes: draft.notes.trim() || null,
           link: draft.link.trim() || null,
+          image_url: draft.image_url.trim() || null,
           avg_price,
         }),
       });
@@ -718,17 +776,33 @@ export function AdminPanel() {
               <Loader2 className="h-4 w-4 animate-spin text-ink-soft" />
             ) : null}
           </div>
-          <Button
-            type="button"
-            className="h-10 rounded-full"
-            onClick={() => {
-              setMessage(null);
-              setCreateOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Incluir novo item
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-full"
+              disabled={enrichingImages}
+              onClick={() => void handleEnrichImages()}
+            >
+              {enrichingImages ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImagePlus className="h-4 w-4" />
+              )}
+              Buscar imagens dos links
+            </Button>
+            <Button
+              type="button"
+              className="h-10 rounded-full"
+              onClick={() => {
+                setMessage(null);
+                setCreateOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Incluir novo item
+            </Button>
+          </div>
         </div>
         <ul className="space-y-2">
           {gifts.map((gift) => {
@@ -813,6 +887,53 @@ export function AdminPanel() {
                         placeholder="https://..."
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-image-${gift.id}`}>
+                        Imagem (URL)
+                      </Label>
+                      <Input
+                        id={`edit-image-${gift.id}`}
+                        value={editing.image_url}
+                        onChange={(e) =>
+                          setDraft((d) =>
+                            d ? { ...d, image_url: e.target.value } : d,
+                          )
+                        }
+                        className="h-11 rounded-2xl text-base"
+                        placeholder="https://.../foto.jpg"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-full"
+                          disabled={fetchingImage || !editing.link.trim()}
+                          onClick={() =>
+                            void fetchImageFromLink(editing.link, (url) =>
+                              setDraft((d) =>
+                                d ? { ...d, image_url: url } : d,
+                              ),
+                            )
+                          }
+                        >
+                          {fetchingImage ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4" />
+                          )}
+                          Buscar do link
+                        </Button>
+                        {editing.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={editing.image_url}
+                            alt=""
+                            className="h-12 w-12 rounded-xl object-cover ring-1 ring-border/60"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
                     {gift.claimed_by ? (
                       <p className="text-sm text-ink-soft">
                         Reservado por <strong>{gift.claimed_by}</strong>
@@ -848,7 +969,17 @@ export function AdminPanel() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1 overflow-hidden">
+                    <div className="flex min-w-0 flex-1 gap-3 overflow-hidden">
+                      {gift.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={gift.image_url}
+                          alt=""
+                          className="h-14 w-14 shrink-0 rounded-2xl object-cover ring-1 ring-border/60"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-display text-base text-ink">
                           {gift.title}
@@ -889,6 +1020,7 @@ export function AdminPanel() {
                       ) : (
                         <p className="mt-1 text-sm text-sage">Disponível</p>
                       )}
+                      </div>
                     </div>
                     <div className="flex shrink-0 flex-nowrap gap-2">
                       <Button
@@ -996,6 +1128,46 @@ export function AdminPanel() {
                 className="h-12 rounded-2xl text-base"
                 placeholder="https://..."
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="imageUrl">Imagem (URL)</Label>
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="h-12 rounded-2xl text-base"
+                placeholder="https://.../foto.jpg"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 rounded-full"
+                  disabled={fetchingImage || !link.trim()}
+                  onClick={() =>
+                    void fetchImageFromLink(link, (url) => setImageUrl(url))
+                  }
+                >
+                  {fetchingImage ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-4 w-4" />
+                  )}
+                  Buscar do link
+                </Button>
+                {imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    className="h-12 w-12 rounded-xl object-cover ring-1 ring-border/60"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : null}
+              </div>
+              <p className="text-xs text-ink-soft">
+                Se a busca automática falhar, cole a URL da imagem do produto.
+              </p>
             </div>
             <Button
               type="submit"

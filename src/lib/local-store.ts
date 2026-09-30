@@ -28,11 +28,13 @@ async function ensureStore(): Promise<Gift[]> {
       category: g.category ?? null,
       notes: g.notes ?? null,
       link: g.link ?? null,
+      image_url: g.image_url ?? null,
       avg_price: g.avg_price ?? null,
     }));
   } catch {
     const gifts: Gift[] = seedGifts.map((g) => ({
       ...g,
+      image_url: g.image_url ?? null,
       id: randomUUID(),
     }));
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -64,6 +66,7 @@ export async function localCreateGift(input: GiftInput): Promise<Gift> {
       category: input.category?.trim() || null,
       notes: input.notes?.trim() || null,
       link: input.link?.trim() || null,
+      image_url: input.image_url?.trim() || null,
       avg_price:
         input.avg_price == null || Number.isNaN(Number(input.avg_price))
           ? null
@@ -82,7 +85,17 @@ export async function localCreateGift(input: GiftInput): Promise<Gift> {
 export async function localUpdateGift(
   id: string,
   patch: Partial<
-    Pick<Gift, "title" | "brand" | "category" | "notes" | "link" | "avg_price" | "sort_order">
+    Pick<
+      Gift,
+      | "title"
+      | "brand"
+      | "category"
+      | "notes"
+      | "link"
+      | "image_url"
+      | "avg_price"
+      | "sort_order"
+    >
   >,
 ): Promise<Gift | null> {
   return enqueue(async () => {
@@ -103,6 +116,10 @@ export async function localUpdateGift(
         patch.notes === undefined ? gifts[idx].notes : patch.notes?.trim() || null,
       link:
         patch.link === undefined ? gifts[idx].link : patch.link?.trim() || null,
+      image_url:
+        patch.image_url === undefined
+          ? gifts[idx].image_url
+          : patch.image_url?.trim() || null,
       avg_price:
         patch.avg_price === undefined
           ? gifts[idx].avg_price

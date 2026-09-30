@@ -5,6 +5,8 @@ export type Gift = {
   category: string | null;
   notes: string | null;
   link: string | null;
+  /** URL de imagem de referência do produto (opcional). */
+  image_url: string | null;
   /** Preço médio estimado em BRL (opcional). */
   avg_price: number | null;
   claimed_by: string | null;
@@ -19,6 +21,7 @@ export type GiftInput = {
   category?: string | null;
   notes?: string | null;
   link?: string | null;
+  image_url?: string | null;
   avg_price?: number | null;
   sort_order?: number;
 };

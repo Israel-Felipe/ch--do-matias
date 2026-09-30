@@ -21,6 +21,105 @@ import { cn, formatAvgPrice } from "@/lib/utils";
 type Filter = "all" | "available" | "claimed";
 type DialogMode = "claim" | "release";
 
+const imageFetchQueue: Array<() => void> = [];
+let imageFetchActive = 0;
+const IMAGE_FETCH_LIMIT = 2;
+
+function enqueueImageFetch(task: () => Promise<void>) {
+  return new Promise<void>((resolve) => {
+    const run = () => {
+      imageFetchActive += 1;
+      void task().finally(() => {
+        imageFetchActive -= 1;
+        const next = imageFetchQueue.shift();
+        if (next) next();
+        resolve();
+      });
+    };
+    if (imageFetchActive < IMAGE_FETCH_LIMIT) run();
+    else imageFetchQueue.push(run);
+  });
+}
+
+function GiftThumb({
+  gift,
+  claimed,
+}: {
+  gift: GiftType;
+  claimed: boolean;
+}) {
+  const [src, setSrc] = useState<string | null>(gift.image_url);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setSrc(gift.image_url);
+    setFailed(false);
+  }, [gift.id, gift.image_url]);
+
+  useEffect(() => {
+    if (src || failed || !gift.link) return;
+
+    let cancelled = false;
+
+    void enqueueImageFetch(async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/gifts/${gift.id}/image`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          if (!cancelled) setFailed(true);
+          return;
+        }
+        const data = (await res.json()) as { image_url?: string | null };
+        if (!cancelled && data.image_url) setSrc(data.image_url);
+        else if (!cancelled) setFailed(true);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [src, failed, gift.id, gift.link]);
+
+  return (
+    <span
+      className={cn(
+        "relative mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl",
+        claimed ? "bg-muted text-ink-soft" : "bg-pond text-ink",
+      )}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          className={cn("h-full w-full object-cover", claimed && "opacity-55")}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setSrc(null);
+            setFailed(true);
+          }}
+        />
+      ) : claimed ? (
+        <Check className="h-4 w-4" />
+      ) : gift.link && !failed ? (
+        <Loader2 className="h-4 w-4 animate-spin opacity-60" />
+      ) : (
+        <Gift className="h-4 w-4" />
+      )}
+      {claimed && src ? (
+        <span className="absolute inset-0 flex items-center justify-center bg-white/45">
+          <Check className="h-4 w-4 text-ink" />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function PixNotice() {
   const [copied, setCopied] = useState(false);
 
@@ -75,7 +174,7 @@ export function GiftList() {
   const [gifts, setGifts] = useState<GiftType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("available");
   const [query, setQuery] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
@@ -379,18 +478,7 @@ export function GiftList() {
                           claimed ? "cursor-default" : "active:opacity-80",
                         )}
                       >
-                        <span
-                          className={cn(
-                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                            claimed ? "bg-muted text-ink-soft" : "bg-pond text-ink",
-                          )}
-                        >
-                          {claimed ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Gift className="h-4 w-4" />
-                          )}
-                        </span>
+                        <GiftThumb gift={gift} claimed={claimed} />
                         <span className="min-w-0 flex-1">
                           <span className="block font-display text-base leading-snug text-ink">
                             {gift.title}
@@ -411,11 +499,8 @@ export function GiftList() {
                             </span>
                           ) : null}
                           {claimed ? (
-                            <span className="mt-1 block text-xs text-ink-soft">
-                              Reservado por{" "}
-                              <span className="font-bold text-ink">
-                                {gift.claimed_by}
-                              </span>
+                            <span className="mt-1 block text-xs font-semibold text-ink-soft">
+                              Já reservado
                             </span>
                           ) : (
                             <span className="mt-1 block text-xs font-semibold text-copper">
@@ -487,20 +572,13 @@ export function GiftList() {
                   Você está reservando{" "}
                   <span className="font-semibold text-ink">{selected?.title}</span>
                   {selected?.brand ? <> ({selected.brand})</> : null}. Seu nome
-                  ficará visível para os outros convidados.
+                  não será exibido para os outros convidados.
                 </>
               ) : (
                 <>
                   Para liberar{" "}
                   <span className="font-semibold text-ink">{selected?.title}</span>,
-                  digite o mesmo nome de quem reservou
-                  {selected?.claimed_by ? (
-                    <>
-                      {" "}
-                      (<span className="font-semibold text-ink">{selected.claimed_by}</span>)
-                    </>
-                  ) : null}
-                  .
+                  digite o mesmo nome usado na reserva.
                 </>
               )}
             </DialogDescription>

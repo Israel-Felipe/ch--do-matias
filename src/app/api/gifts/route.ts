@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       category?: string | null;
       notes?: string | null;
       link?: string | null;
+      image_url?: string | null;
       avg_price?: number | null;
     };
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
       category: body.category,
       notes: body.notes,
       link: body.link,
+      image_url: body.image_url,
       avg_price: body.avg_price,
     });
 
