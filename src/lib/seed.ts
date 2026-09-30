@@ -13,7 +13,9 @@ export const eventInfo: EventInfo = {
   rsvpLabel: "Confirme sua presença até 14/10",
   childMaxAge: 10,
   intro:
-    "Lista para o enxoval do Matias. Ao escolher um presente, deixe seu nome no item para evitar repetidos. Os links são só referência — pode comprar em outra loja, mantendo a marca quando possível. Temos também alguns itens mais caros; se preferir presentear com um PIX para ajudar a comprá-los, ao invés de um item da lista, a chave está no final da página. A presença de vocês é o que mais importa.",
+    "Lista para o enxoval do Matias. Ao escolher um presente, deixe seu nome no item para evitar repetidos. Os links são só referência — pode comprar em outra loja, mantendo a marca quando possível. Também há a opção de presentear via PIX para ajudar com o enxoval. A presença de vocês é o que mais importa.",
+  listNote:
+    "Vamos usar fraldas ecológicas no Matias — por isso a quantidade de fraldas na lista é pequena. Se quiser ajudar com algo fora da lista, preferimos um valor em PIX para o enxoval, em vez de fraldas que não estão disponíveis para marcar aqui.",
   pixKey: "09480778912",
   verse: "Antes que eu te formasse no ventre eu te conheci.",
   verseReference: "Jeremias 1:5",

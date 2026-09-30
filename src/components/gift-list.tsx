@@ -21,106 +21,7 @@ import { cn, formatAvgPrice } from "@/lib/utils";
 type Filter = "all" | "available" | "claimed";
 type DialogMode = "claim" | "release";
 
-const imageFetchQueue: Array<() => void> = [];
-let imageFetchActive = 0;
-const IMAGE_FETCH_LIMIT = 2;
-
-function enqueueImageFetch(task: () => Promise<void>) {
-  return new Promise<void>((resolve) => {
-    const run = () => {
-      imageFetchActive += 1;
-      void task().finally(() => {
-        imageFetchActive -= 1;
-        const next = imageFetchQueue.shift();
-        if (next) next();
-        resolve();
-      });
-    };
-    if (imageFetchActive < IMAGE_FETCH_LIMIT) run();
-    else imageFetchQueue.push(run);
-  });
-}
-
-function GiftThumb({
-  gift,
-  claimed,
-}: {
-  gift: GiftType;
-  claimed: boolean;
-}) {
-  const [src, setSrc] = useState<string | null>(gift.image_url);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setSrc(gift.image_url);
-    setFailed(false);
-  }, [gift.id, gift.image_url]);
-
-  useEffect(() => {
-    if (src || failed || !gift.link) return;
-
-    let cancelled = false;
-
-    void enqueueImageFetch(async () => {
-      if (cancelled) return;
-      try {
-        const res = await fetch(`/api/gifts/${gift.id}/image`, {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          if (!cancelled) setFailed(true);
-          return;
-        }
-        const data = (await res.json()) as { image_url?: string | null };
-        if (!cancelled && data.image_url) setSrc(data.image_url);
-        else if (!cancelled) setFailed(true);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [src, failed, gift.id, gift.link]);
-
-  return (
-    <span
-      className={cn(
-        "relative mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-        claimed ? "bg-muted text-ink-soft" : "bg-pond text-ink",
-      )}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt=""
-          className={cn("h-full w-full object-cover", claimed && "opacity-55")}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => {
-            setSrc(null);
-            setFailed(true);
-          }}
-        />
-      ) : claimed ? (
-        <Check className="h-4 w-4" />
-      ) : gift.link && !failed ? (
-        <Loader2 className="h-4 w-4 animate-spin opacity-60" />
-      ) : (
-        <Gift className="h-4 w-4" />
-      )}
-      {claimed && src ? (
-        <span className="absolute inset-0 flex items-center justify-center bg-white/45">
-          <Check className="h-4 w-4 text-ink" />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function PixNotice() {
+function PixGiftRow() {
   const [copied, setCopied] = useState(false);
 
   async function copyPix() {
@@ -134,39 +35,54 @@ function PixNotice() {
   }
 
   return (
-    <div className="rounded-[1.5rem] bg-gradient-to-br from-copper/15 via-butter/25 to-sage-soft/40 px-5 py-6 text-center ring-1 ring-copper/30 sm:px-7 sm:py-7">
-      <p className="font-display text-xl leading-snug text-ink sm:text-2xl">
-        Essa lista não te atendeu?
-      </p>
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft sm:text-base">
-        Você também pode presentear via PIX
-      </p>
-      <button
-        type="button"
-        onClick={() => void copyPix()}
-        className="mx-auto mt-5 flex w-full max-w-xs flex-col items-center gap-1 rounded-2xl bg-white/90 px-4 py-3.5 shadow-[0_10px_28px_-18px_rgba(94,75,60,0.55)] ring-1 ring-copper/20 transition hover:bg-white active:scale-[0.99]"
-      >
-        <span className="text-[0.65rem] font-bold tracking-[0.22em] text-copper uppercase">
-          Chave PIX (CPF)
-        </span>
-        <span className="font-body text-xl font-bold tracking-wide text-ink sm:text-2xl">
-          {eventInfo.pixKey}
-        </span>
-        <span className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
-          {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5 text-sage" />
-              Copiado!
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Toque para copiar
-            </>
-          )}
-        </span>
-      </button>
-    </div>
+    <li>
+      <div className="flex w-full items-start gap-3 px-4 py-4 text-left">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pond text-ink">
+            <Copy className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-base leading-snug text-ink">
+              Pix para ajudar com o enxoval
+            </span>
+            <span className="mt-0.5 block text-xs text-ink-soft">
+              Valor: sua escolha
+            </span>
+            <span className="mt-0.5 block text-xs font-semibold tracking-wide text-ink">
+              Chave PIX: {eventInfo.pixKey}
+            </span>
+            <span className="mt-1 block text-xs font-semibold text-copper">
+              Sempre disponível
+            </span>
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Badge
+            variant="secondary"
+            className="rounded-full bg-cream-deep px-2.5 py-1 text-[0.65rem] uppercase tracking-wide text-ink ring-1 ring-border/60"
+          >
+            Livre
+          </Badge>
+          <button
+            type="button"
+            onClick={() => void copyPix()}
+            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-card px-2.5 text-[0.7rem] font-bold text-ink-soft ring-1 ring-border/80 transition hover:bg-white"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3 w-3 text-sage" />
+                Copiado
+              </>
+            ) : (
+              <>
+                <Copy className="h-3 w-3" />
+                Copiar PIX
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -240,6 +156,15 @@ export function GiftList() {
       );
     });
   }, [gifts, filter, query, priceMin, priceMax]);
+
+  const showPixItem = useMemo(() => {
+    if (filter === "claimed") return false;
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      q.includes("pix") || q.includes("enxoval") || q.includes("ajuda")
+    );
+  }, [filter, query]);
 
   const pricePreset = useMemo(() => {
     const min = priceMin.trim();
@@ -434,6 +359,10 @@ export function GiftList() {
           </div>
         </div>
 
+        <p className="mt-5 rounded-2xl bg-sage-soft/35 px-4 py-3 text-sm leading-relaxed text-ink-soft ring-1 ring-sage/25 sm:px-5">
+          {eventInfo.listNote}
+        </p>
+
         {flash ? (
           <div
             role="status"
@@ -457,7 +386,7 @@ export function GiftList() {
                 Tentar de novo
               </Button>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && !showPixItem ? (
             <div className="flex min-h-48 flex-col items-center justify-center gap-2 bg-card/50 px-6 text-center text-ink-soft">
               <Gift className="h-6 w-6" />
               <p className="text-sm">Nenhum item encontrado com esse filtro.</p>
@@ -478,7 +407,18 @@ export function GiftList() {
                           claimed ? "cursor-default" : "active:opacity-80",
                         )}
                       >
-                        <GiftThumb gift={gift} claimed={claimed} />
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                            claimed ? "bg-muted text-ink-soft" : "bg-pond text-ink",
+                          )}
+                        >
+                          {claimed ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Gift className="h-4 w-4" />
+                          )}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block font-display text-base leading-snug text-ink">
                             {gift.title}
@@ -546,12 +486,9 @@ export function GiftList() {
                   </li>
                 );
               })}
+              {showPixItem ? <PixGiftRow /> : null}
             </ul>
           )}
-        </div>
-
-        <div className="mt-8">
-          <PixNotice />
         </div>
       </div>
 

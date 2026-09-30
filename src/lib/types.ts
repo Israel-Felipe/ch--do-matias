@@ -67,6 +67,7 @@ export type EventInfo = {
   /** Idade máxima considerada criança no RSVP. */
   childMaxAge: number;
   intro: string;
+  listNote: string;
   pixKey: string;
   verse: string;
   verseReference: string;
